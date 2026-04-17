@@ -1,0 +1,193 @@
+import type { TemplateMessageRequest, TextMessageRequest, CtaUrlMessageRequest } from '../../types/whatsapp.js';
+
+const LANG = { code: 'de' };
+
+// ── Freitext + CTA-Button (24h-Servicefenster, kein Template nötig) ──────────
+// Mit walletUrl: interaktive Nachricht mit "Stempelkarte öffnen"-Button.
+// Ohne walletUrl: einfacher Text-Fallback.
+// Sobald genehmigte Templates vorliegen, auf Template-Varianten umstellen.
+
+type OutboundMessage = TextMessageRequest | CtaUrlMessageRequest;
+
+export function stampIssuedText(
+  to: string,
+  count: number,
+  total: number,
+  stampsPerReward: number,
+  walletUrl?: string,
+): OutboundMessage {
+  const remaining = stampsPerReward - total;
+  const body =
+    `Du hast ${count} Stempel erhalten! 🎉\n\n` +
+    `📍 Aktueller Stand: ${total}/${stampsPerReward} Stempel\n` +
+    `Noch ${remaining} bis zu deiner Belohnung.`;
+
+  if (walletUrl) {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: body },
+        action: { name: 'cta_url', parameters: { display_text: 'Stempelkarte öffnen', url: walletUrl } },
+      },
+    };
+  }
+
+  return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };
+}
+
+export function rewardEarnedText(
+  to: string,
+  voucherCode: string,
+  description: string,
+  walletUrl?: string,
+): OutboundMessage {
+  const body =
+    `🎉 Glückwunsch! Du hast deine Belohnung verdient!\n\n` +
+    `🎁 ${description}\n` +
+    `Dein Code: *${voucherCode}*\n\n` +
+    `Zeige diesen Code beim nächsten Besuch vor.`;
+
+  if (walletUrl) {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: body },
+        action: { name: 'cta_url', parameters: { display_text: 'Gutschein ansehen', url: walletUrl } },
+      },
+    };
+  }
+
+  return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };
+}
+
+export function optOutConfirmText(to: string): TextMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'text',
+    text: {
+      body: 'Du wurdest erfolgreich vom Treueprogramm abgemeldet. Auf Wiedersehen! 👋',
+    },
+  };
+}
+
+export function stampIssuedTemplate(
+  to: string,
+  count: number,
+  total: number,
+  stampsPerReward: number,
+): TemplateMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: 'stamp_issued',
+      language: LANG,
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: String(count) },
+            { type: 'text', text: String(total) },
+            { type: 'text', text: String(stampsPerReward) },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+export function rewardEarnedTemplate(
+  to: string,
+  voucherCode: string,
+  description: string,
+): TemplateMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: 'reward_earned',
+      language: LANG,
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: description },
+            { type: 'text', text: voucherCode },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+export function voucherIssuedTemplate(
+  to: string,
+  code: string,
+  description: string,
+): TemplateMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: 'voucher_issued',
+      language: LANG,
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: description },
+            { type: 'text', text: code },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+export function optOutConfirmTemplate(to: string): TemplateMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: 'opt_out_confirm',
+      language: LANG,
+    },
+  };
+}
+
+export function winBackTemplate(to: string, businessName: string): TemplateMessageRequest {
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: 'win_back',
+      language: LANG,
+      components: [
+        {
+          type: 'body',
+          parameters: [{ type: 'text', text: businessName }],
+        },
+      ],
+    },
+  };
+}

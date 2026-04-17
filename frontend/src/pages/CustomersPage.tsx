@@ -1,0 +1,84 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
+import { useCustomers } from '@/hooks/useCustomers';
+import { formatDate } from '@/lib/utils';
+
+export function CustomersPage() {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useCustomers({ ...(search ? { search } : {}), page, optedOut: 'false' });
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Kunden</h1>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Nach Name suchen…"
+          className="flex h-10 w-full max-w-sm rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Telefon</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Stempel</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Beigetreten</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Wird geladen…</td></tr>
+            ) : data?.data.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Noch keine Kunden</td></tr>
+            ) : (
+              data?.data.map((c) => (
+                <tr
+                  key={c.id}
+                  className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => navigate(`/customers/${c.id}`)}
+                >
+                  <td className="px-4 py-3 font-medium">{c.display_name ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.phone_display}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{c.total_stamps}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(c.opted_in_at)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {data && data.total > data.pageSize && (
+        <div className="flex justify-center gap-2">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          >
+            Zurück
+          </button>
+          <span className="px-3 py-1 text-sm text-muted-foreground">
+            Seite {page} von {Math.ceil(data.total / data.pageSize)}
+          </span>
+          <button
+            disabled={page >= Math.ceil(data.total / data.pageSize)}
+            onClick={() => setPage(page + 1)}
+            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+          >
+            Weiter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
