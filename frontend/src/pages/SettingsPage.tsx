@@ -6,12 +6,13 @@ import { useBusiness, useUpdateBusiness } from '@/hooks/useBusiness';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Tab = 'allgemein' | 'treuekarte' | 'erscheinungsbild' | 'qrcode' | 'abonnement';
+type Tab = 'allgemein' | 'treuekarte' | 'erscheinungsbild' | 'whatsapp' | 'qrcode' | 'abonnement';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'allgemein',        label: 'Allgemein' },
   { id: 'treuekarte',       label: 'Treuekarte' },
   { id: 'erscheinungsbild', label: 'Erscheinungsbild' },
+  { id: 'whatsapp',         label: 'WhatsApp' },
   { id: 'qrcode',           label: 'QR-Code' },
   { id: 'abonnement',       label: 'Abonnement' },
 ];

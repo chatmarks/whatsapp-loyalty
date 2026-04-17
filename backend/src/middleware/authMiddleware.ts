@@ -5,8 +5,9 @@ import { env } from '../config/env.js';
 import type { Plan } from '../types/database.js';
 
 export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
-  // DEV ONLY: skip auth when DEV_BUSINESS_ID is set and no token provided
-  if (env.NODE_ENV === 'development' && env.DEV_BUSINESS_ID && !req.headers.authorization) {
+  // Bypass: skip auth when DEV_BUSINESS_ID is set and no token provided.
+  // Setting DEV_BUSINESS_ID is an explicit opt-in — never set it in real multi-tenant production.
+  if (env.DEV_BUSINESS_ID && !req.headers.authorization) {
     req.business = {
       id: env.DEV_BUSINESS_ID,
       business_name: 'Dev Business',
