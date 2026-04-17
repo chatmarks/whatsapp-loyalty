@@ -23,6 +23,9 @@ import { publicRouter } from './modules/public/public.router.js';
 export function createApp(): express.Application {
   const app = express();
 
+  // Trust the first proxy hop (Railway / Vercel / ngrok all set X-Forwarded-For)
+  app.set('trust proxy', 1);
+
   // Security headers
   app.use(helmet());
 

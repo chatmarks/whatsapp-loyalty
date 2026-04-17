@@ -79,12 +79,17 @@ export async function findBusinessByWaPhoneId(
   stamp_count: number;
   reward_stages: Array<{ stamp: number; description: string }> | null;
 } | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('businesses')
     .select('id, business_name, slug, stamps_per_reward, reward_description, stamp_count, reward_stages')
     .eq('wa_phone_number_id', phoneNumberId)
     .eq('active', true)
     .maybeSingle();
+
+  if (error) {
+    logger.error({ error, phoneNumberId }, 'DB error in findBusinessByWaPhoneId');
+    return null;
+  }
 
   return data ?? null;
 }
