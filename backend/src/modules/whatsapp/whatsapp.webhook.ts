@@ -42,13 +42,13 @@ async function handleInboundMessage(
   msg: InboundMessage,
   phoneNumberId: string,
 ): Promise<void> {
-  // Dedup: skip if already processed
+  // Dedup: wa_message_id is PRIMARY KEY — duplicate insert returns 23505
   const { error: dedupError } = await supabase
     .from('wa_message_events')
-    .insert({ wa_message_id: msg.id, business_id: '', event_type: 'inbound', processed_at: new Date().toISOString() })
-    .select();
+    .insert({ wa_message_id: msg.id, event_type: 'inbound' });
 
   if (dedupError?.code === '23505') return;
+  if (dedupError) logger.warn({ dedupError }, 'Dedup insert failed — processing anyway');
 
   const business = await findBusinessByWaPhoneId(phoneNumberId);
   if (!business) {
