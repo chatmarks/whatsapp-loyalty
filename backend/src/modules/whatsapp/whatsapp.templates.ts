@@ -15,9 +15,10 @@ export function stampIssuedText(
   total: number,
   stampsPerReward: number,
   walletUrl?: string,
+  customBody?: string,
 ): OutboundMessage {
   const remaining = stampsPerReward - total;
-  const body =
+  const body = customBody ??
     `Du hast ${count} Stempel erhalten! 🎉\n\n` +
     `📍 Aktueller Stand: ${total}/${stampsPerReward} Stempel\n` +
     `Noch ${remaining} bis zu deiner Belohnung.`;
@@ -44,8 +45,9 @@ export function rewardEarnedText(
   voucherCode: string,
   description: string,
   walletUrl?: string,
+  customBody?: string,
 ): OutboundMessage {
-  const body =
+  const body = customBody ??
     `🎉 Glückwunsch! Du hast deine Belohnung verdient!\n\n` +
     `🎁 ${description}\n` +
     `Dein Code: *${voucherCode}*\n\n` +
@@ -68,14 +70,14 @@ export function rewardEarnedText(
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };
 }
 
-export function optOutConfirmText(to: string): TextMessageRequest {
+export function optOutConfirmText(to: string, customBody?: string): TextMessageRequest {
   return {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
     type: 'text',
     text: {
-      body: 'Du wurdest erfolgreich vom Treueprogramm abgemeldet. Auf Wiedersehen! 👋',
+      body: customBody ?? 'Du wurdest erfolgreich vom Treueprogramm abgemeldet. Auf Wiedersehen! 👋',
     },
   };
 }

@@ -6,6 +6,7 @@ import { SetupPage } from '@/pages/SetupPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { CustomersPage } from '@/pages/CustomersPage';
 import { CustomerDetailPage } from '@/pages/CustomerDetailPage';
+import { CustomerChatPage } from '@/pages/CustomerChatPage';
 import { StampsPage } from '@/pages/StampsPage';
 import { OrdersPage } from '@/pages/OrdersPage';
 import { NewOrderPage } from '@/pages/NewOrderPage';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="setup" element={<SetupPage />} />
         <Route path="customers" element={<CustomersPage />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
+        <Route path="customers/:id/chat" element={<CustomerChatPage />} />
         <Route path="stamps" element={<StampsPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/new" element={<NewOrderPage />} />

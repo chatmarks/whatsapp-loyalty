@@ -3,7 +3,7 @@
 export type Plan = 'free' | 'starter' | 'pro';
 export type OrderStatus = 'pending' | 'paid' | 'cancelled';
 export type OrderSource = 'admin' | 'client_form';
-export type StampSource = 'manual' | 'order' | 'referral';
+export type StampSource = 'manual' | 'order' | 'referral' | 'keyword';
 export type VoucherType = 'reward' | 'manual' | 'birthday' | 'winback';
 export type DiscountType = 'percent' | 'fixed' | 'free_item';
 export type BlastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -32,7 +32,8 @@ export interface Business {
   stamps_per_reward: number;
   reward_description: string;
   stamp_count: number;
-  reward_stages: Array<{ stamp: number; description: string }>;
+  reward_stages: Array<{ stamp: number; description: string; emoji?: string }>;
+  message_templates: Record<string, string> | null;
   blast_count_this_week: number;
   blast_week_reset_at: string | null;
   logo_url: string | null;
@@ -64,6 +65,7 @@ export interface Customer {
   referral_code: string | null;
   referred_by_id: string | null;
   notes: string | null;
+  wallet_token: string | null;
   created_at: string;
   updated_at: string;
 }

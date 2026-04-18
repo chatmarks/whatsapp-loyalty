@@ -16,7 +16,8 @@ export interface Business {
   stamps_per_reward: number;
   reward_description: string;
   stamp_count: number;
-  reward_stages: Array<{ stamp: number; description: string }>;
+  reward_stages: Array<{ stamp: number; description: string; emoji?: string }>;
+  message_templates: Record<string, string> | null;
   blast_count_this_week: number;
   logo_url: string | null;
   banner_url: string | null;
@@ -52,13 +53,14 @@ export interface Customer {
   opted_out_at: string | null;
   last_interaction_at: string | null;
   referral_code: string | null;
+  wallet_token: string | null;
   created_at: string;
 }
 
 export interface StampEvent {
   id: string;
   amount: number;
-  source: 'manual' | 'order' | 'referral';
+  source: 'manual' | 'order' | 'referral' | 'keyword';
   created_at: string;
 }
 

@@ -61,6 +61,26 @@ async function handleInboundMessage(
     .update({ business_id: business.id })
     .eq('wa_message_id', msg.id);
 
+  // Resolve customer by phone hash for message storage
+  const phoneHash = hashPhone(`+${msg.from}`);
+  const { data: msgCustomer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('business_id', business.id)
+    .eq('phone_hash', phoneHash)
+    .maybeSingle();
+
+  if (msg.type === 'text' && msg.text) {
+    void supabase.from('wa_messages').insert({
+      business_id: business.id,
+      customer_id: msgCustomer?.id ?? null,
+      direction: 'inbound',
+      body: msg.text.body,
+      wa_message_id: msg.id,
+      status: 'delivered',
+    }); // fire-and-forget, non-blocking
+  }
+
   if (msg.type !== 'text' || !msg.text) return;
 
   const text = msg.text.body.trim().toLowerCase();
@@ -107,22 +127,40 @@ async function handleKeywordStamp(
     .maybeSingle();
 
   if (!customer) {
-    // Unbekannte Nummer — freundlicher Hinweis zum Registrieren
+    // Unbekannte Nummer — freundlicher Hinweis mit CTA-Button zum Registrieren
     const tmpEnc = encryptPhone(e164);
     const { data: biz } = await supabase
       .from('businesses')
-      .select('wa_access_token_enc, slug')
+      .select('wa_access_token_enc, slug, message_templates')
       .eq('id', business.id)
       .single();
 
     if (biz?.wa_access_token_enc) {
-      const { to: _to, ...body } = {
-        messaging_product: 'whatsapp' as const,
-        recipient_type: 'individual' as const,
-        to: e164,
-        type: 'text' as const,
-        text: { body: `Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 👉 ${biz.slug ? `${process.env['CLIENT_URL'] ?? ''}/r/${biz.slug}` : 'Frag das Personal nach dem Link.'}` },
-      };
+      const regUrl = biz.slug
+        ? `${process.env['CLIENT_URL'] ?? ''}/r/${biz.slug}`
+        : null;
+      const customText = (biz.message_templates as Record<string, string> | null)?.['not_registered'];
+      const bodyText = customText
+        ?? 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉';
+
+      const body = regUrl
+        ? {
+            messaging_product: 'whatsapp' as const,
+            recipient_type: 'individual' as const,
+            type: 'interactive' as const,
+            interactive: {
+              type: 'cta_url' as const,
+              body: { text: bodyText },
+              action: { name: 'cta_url' as const, parameters: { display_text: 'Jetzt registrieren', url: regUrl } },
+            },
+          }
+        : {
+            messaging_product: 'whatsapp' as const,
+            recipient_type: 'individual' as const,
+            type: 'text' as const,
+            text: { body: bodyText },
+          };
+
       await sendMessage(phoneNumberId, biz.wa_access_token_enc, tmpEnc, body);
     }
     return;
@@ -142,22 +180,26 @@ async function handleKeywordStamp(
 
   const { data: biz } = await supabase
     .from('businesses')
-    .select('wa_access_token_enc')
+    .select('wa_access_token_enc, message_templates')
     .eq('id', business.id)
     .single();
 
   if (!biz?.wa_access_token_enc) return;
 
+  const customTemplates = (biz.message_templates as Record<string, string> | null) ?? {};
+
   if (recentStamp) {
     // Cooldown aktiv — ablehnen
     const nextAvailable = new Date(new Date(recentStamp.created_at).getTime() + STAMP_COOLDOWN_HOURS * 60 * 60 * 1000);
     const hours = Math.ceil((nextAvailable.getTime() - Date.now()) / (60 * 60 * 1000));
+    const cooldownText = (customTemplates['stamp_cooldown'] ?? 'Du hast heute bereits einen Stempel erhalten. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) verfügbar.')
+      .replace('{hours}', String(hours));
     const { to: _to, ...body } = {
       messaging_product: 'whatsapp' as const,
       recipient_type: 'individual' as const,
       to: e164,
       type: 'text' as const,
-      text: { body: `Du hast heute bereits einen Stempel erhalten. ⏳\n\nDer nächste ist in ca. ${hours} Stunde${hours === 1 ? '' : 'n'} verfügbar.` },
+      text: { body: cooldownText },
     };
     await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, body);
     return;
@@ -205,12 +247,34 @@ async function handleKeywordStamp(
     : undefined;
 
   const firstStage = crossed[0];
-  const msgObj = rewardIssued && firstStage
-    ? rewardEarnedText(e164, voucherCodes.join(', '), firstStage.description, walletUrl)
-    : stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl);
+
+  // Apply custom template body if configured, else use default
+  let msgObj;
+  if (rewardIssued && firstStage) {
+    const customBody = customTemplates['reward_earned']
+      ?.replace('{description}', firstStage.description)
+      .replace('{code}', voucherCodes.join(', '));
+    msgObj = rewardEarnedText(e164, voucherCodes.join(', '), firstStage.description, walletUrl, customBody);
+  } else {
+    const remaining = stampCount - finalTotal;
+    const customBody = customTemplates['stamp_issued']
+      ?.replace('{count}', '1')
+      .replace('{total}', String(finalTotal))
+      .replace('{stampCount}', String(stampCount))
+      .replace('{remaining}', String(remaining));
+    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody);
+  }
 
   const { to: _to, ...msgBody } = msgObj;
-  await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msgBody);
+  const waMessageId = await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msgBody);
+
+  await supabase.from('notification_logs').insert({
+    business_id: business.id,
+    customer_id: customer.id,
+    event_type: rewardIssued ? 'voucher_issued' : 'stamp_issued',
+    status: 'sent',
+    ...(waMessageId !== null ? { wa_message_id: waMessageId } : {}),
+  });
 
   logger.info({ businessId: business.id, customerId: customer.id, rewardIssued }, 'Keyword stamp issued');
 }
@@ -245,13 +309,14 @@ async function handleOptOut(
 
   const { data: biz } = await supabase
     .from('businesses')
-    .select('wa_access_token_enc')
+    .select('wa_access_token_enc, message_templates')
     .eq('id', businessId)
     .single();
 
   if (biz?.wa_access_token_enc) {
+    const customBody = (biz.message_templates as Record<string, string> | null)?.['opt_out_confirm'];
     const tmpEnc = encryptPhone(e164);
-    const { to: _to, ...body } = optOutConfirmText(e164);
+    const { to: _to, ...body } = optOutConfirmText(e164, customBody);
     await sendMessage(phoneNumberId, biz.wa_access_token_enc, tmpEnc, body);
   }
 
@@ -262,8 +327,14 @@ async function handleOptOut(
 
 async function handleStatusUpdate(status: MessageStatus): Promise<void> {
   if (!status.id) return;
-  await supabase
-    .from('notification_logs')
-    .update({ status: status.status })
-    .eq('wa_message_id', status.id);
+  await Promise.all([
+    supabase
+      .from('notification_logs')
+      .update({ status: status.status })
+      .eq('wa_message_id', status.id),
+    supabase
+      .from('wa_messages')
+      .update({ status: status.status })
+      .eq('wa_message_id', status.id),
+  ]);
 }

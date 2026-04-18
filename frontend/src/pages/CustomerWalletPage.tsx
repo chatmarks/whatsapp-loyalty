@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 const BASE = `${(import.meta.env['VITE_API_URL'] as string | undefined) ?? ''}/api/v1/public`;
 
-interface RewardStage { stamp: number; description: string }
+interface RewardStage { stamp: number; description: string; emoji?: string }
 
 interface WalletData {
   business: {
@@ -34,12 +34,14 @@ function StampDot({
   isReward,
   index,
   color,
+  emoji,
 }: {
   filled: boolean;
   isNew: boolean;
   isReward: boolean;
   index: number;
   color: string;
+  emoji?: string;
 }) {
   return (
     <div
@@ -75,7 +77,7 @@ function StampDot({
     >
       {filled ? (
         isReward ? (
-          '🎁'
+          emoji ?? '🎁'
         ) : (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path
@@ -88,7 +90,7 @@ function StampDot({
           </svg>
         )
       ) : isReward ? (
-        <span style={{ opacity: 0.6, fontSize: 18 }}>🎁</span>
+        <span style={{ opacity: 0.6, fontSize: 18 }}>{emoji ?? '🎁'}</span>
       ) : null}
     </div>
   );
@@ -342,16 +344,20 @@ export function CustomerWalletPage() {
               gap: 8,
               justifyItems: 'center',
             }}>
-              {Array.from({ length: totalSlots }, (_, i) => i + 1).map((pos) => (
-                <StampDot
-                  key={pos}
-                  index={pos}
-                  filled={pos <= filled}
-                  isNew={isNew && pos === filled}
-                  isReward={rewardPositions.has(pos)}
-                  color={color}
-                />
-              ))}
+              {Array.from({ length: totalSlots }, (_, i) => i + 1).map((pos) => {
+                const stageForPos = rewardStages.find((s) => s.stamp === pos);
+                return (
+                  <StampDot
+                    key={pos}
+                    index={pos}
+                    filled={pos <= filled}
+                    isNew={isNew && pos === filled}
+                    isReward={rewardPositions.has(pos)}
+                    color={color}
+                    {...(stageForPos?.emoji !== undefined ? { emoji: stageForPos.emoji } : {})}
+                  />
+                );
+              })}
             </div>
 
             {/* Progress bar */}

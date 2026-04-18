@@ -6,13 +6,14 @@ import { useBusiness, useUpdateBusiness } from '@/hooks/useBusiness';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Tab = 'allgemein' | 'treuekarte' | 'erscheinungsbild' | 'whatsapp' | 'qrcode' | 'abonnement';
+type Tab = 'allgemein' | 'treuekarte' | 'erscheinungsbild' | 'whatsapp' | 'nachrichten' | 'qrcode' | 'abonnement';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'allgemein',        label: 'Allgemein' },
   { id: 'treuekarte',       label: 'Treuekarte' },
   { id: 'erscheinungsbild', label: 'Erscheinungsbild' },
   { id: 'whatsapp',         label: 'WhatsApp' },
+  { id: 'nachrichten',      label: 'Nachrichten' },
   { id: 'qrcode',           label: 'QR-Code' },
   { id: 'abonnement',       label: 'Abonnement' },
 ];
@@ -22,6 +23,7 @@ function AllgemeinTab() {
   const { data: business } = useBusiness();
   const updateBusiness = useUpdateBusiness();
   const [businessName, setBusinessName] = useState(business?.business_name ?? '');
+  const [slug, setSlug] = useState(business?.slug ?? '');
 
   return (
     <div className="rounded-xl border bg-card p-5 space-y-4 max-w-lg">
@@ -37,18 +39,18 @@ function AllgemeinTab() {
       <div>
         <label className="text-sm font-medium">URL-Kürzel</label>
         <input
-          value={business?.slug ?? ''}
-          disabled
-          className="mt-1 flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Das URL-Kürzel kann nach der Registrierung nicht mehr geändert werden.
+          Nur Kleinbuchstaben, Zahlen und Bindestriche. Änderungen machen bestehende QR-Codes ungültig.
         </p>
       </div>
       <button
         onClick={() =>
           updateBusiness.mutate(
-            { business_name: businessName } as Parameters<typeof updateBusiness.mutate>[0],
+            { businessName, slug } as Parameters<typeof updateBusiness.mutate>[0],
             {
               onSuccess: () => toast.success('Einstellungen gespeichert'),
               onError: (e) => toast.error(e.message),
@@ -67,7 +69,7 @@ function AllgemeinTab() {
 // ── Treuekarte ───────────────────────────────────────────────────────────────
 const STAMP_COUNT_OPTIONS = [5, 6, 7, 8, 9, 10, 11, 12];
 
-interface RewardStage { stamp: number; description: string }
+interface RewardStage { stamp: number; description: string; emoji?: string }
 
 function TreuekarteDot({
   index,
@@ -75,13 +77,15 @@ function TreuekarteDot({
   stages,
   onToggle,
 }: {
-  index: number;       // 1-based stamp position
+  index: number;
   stampCount: number;
   stages: RewardStage[];
   onToggle: (pos: number) => void;
 }) {
-  const isReward = stages.some((s) => s.stamp === index);
+  const stage  = stages.find((s) => s.stamp === index);
+  const isReward = !!stage;
   const isLast   = index === stampCount;
+  const emoji    = stage?.emoji ?? (isLast ? '⭐' : '🎁');
 
   return (
     <button
@@ -97,7 +101,7 @@ function TreuekarteDot({
           : 'border-muted-foreground/30 bg-muted/40 hover:bg-muted',
       )}
     >
-      {isReward ? '🎁' : isLast ? '⭐' : (
+      {isReward ? emoji : isLast ? '⭐' : (
         <span className="text-xs font-bold text-muted-foreground">{index}</span>
       )}
     </button>
@@ -111,11 +115,17 @@ function TreuekartTab() {
   const [stampCount, setStampCount] = useState<number>(
     business?.stamp_count ?? business?.stamps_per_reward ?? 10,
   );
-  const [stages, setStages] = useState<RewardStage[]>(
-    business?.reward_stages?.length
+  const [stages, setStages] = useState<RewardStage[]>(() => {
+    const base = business?.reward_stages?.length
       ? business.reward_stages
-      : [{ stamp: business?.stamp_count ?? 10, description: 'Gratis Produkt' }],
-  );
+      : [{ stamp: business?.stamp_count ?? 10, description: 'Gratis Produkt', emoji: '🎁' }];
+    const count = business?.stamp_count ?? business?.stamps_per_reward ?? 10;
+    // Ensure the last stamp is always a reward stage
+    if (!base.some((s) => s.stamp === count)) {
+      return [...base, { stamp: count, description: 'Gratis Produkt', emoji: '⭐' }].sort((a, b) => a.stamp - b.stamp);
+    }
+    return base;
+  });
 
   // Keep stages valid when stampCount shrinks
   function handleSetStampCount(n: number) {
@@ -131,13 +141,19 @@ function TreuekartTab() {
         if (prev.length === 1) return prev;
         return prev.filter((_, i) => i !== existing);
       }
-      return [...prev, { stamp: pos, description: '' }].sort((a, b) => a.stamp - b.stamp);
+      return [...prev, { stamp: pos, description: '', emoji: '🎁' }].sort((a, b) => a.stamp - b.stamp);
     });
   }
 
   function updateDesc(pos: number, description: string) {
     setStages((prev) =>
       prev.map((s) => (s.stamp === pos ? { ...s, description } : s)),
+    );
+  }
+
+  function updateEmoji(pos: number, emoji: string) {
+    setStages((prev) =>
+      prev.map((s) => (s.stamp === pos ? { ...s, emoji } : s)),
     );
   }
 
@@ -151,7 +167,7 @@ function TreuekartTab() {
     const hasFinal = stages.some((s) => s.stamp === stampCount);
     const finalStages = hasFinal
       ? stages
-      : [...stages, { stamp: stampCount, description: 'Gratis Produkt' }].sort(
+      : [...stages, { stamp: stampCount, description: 'Gratis Produkt', emoji: '⭐' }].sort(
           (a, b) => a.stamp - b.stamp,
         );
 
@@ -227,18 +243,29 @@ function TreuekartTab() {
           {stages
             .sort((a, b) => a.stamp - b.stamp)
             .map((stage) => (
-              <div key={stage.stamp} className="flex items-center gap-3">
+              <div key={stage.stamp} className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 border-2 border-amber-400 text-base">
-                  🎁
+                  {stage.emoji ?? '🎁'}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground mb-1">Stempel {stage.stamp}</p>
-                  <input
-                    value={stage.description}
-                    onChange={(e) => updateDesc(stage.stamp, e.target.value)}
-                    placeholder="z.B. Gratis Kaffee"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    Stempel {stage.stamp}{stage.stamp === stampCount ? ' (Letzter Stempel)' : ''}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      value={stage.emoji ?? ''}
+                      onChange={(e) => updateEmoji(stage.stamp, e.target.value)}
+                      placeholder="🎁"
+                      className="flex h-9 w-16 rounded-md border border-input bg-background px-2 text-center text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title="Emoji für diese Belohnung"
+                    />
+                    <input
+                      value={stage.description}
+                      onChange={(e) => updateDesc(stage.stamp, e.target.value)}
+                      placeholder="z.B. Gratis Kaffee"
+                      className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -279,7 +306,7 @@ function ErscheinungsbildTab() {
       <button
         onClick={() =>
           updateBusiness.mutate(
-            { primary_color: primaryColor } as Parameters<typeof updateBusiness.mutate>[0],
+            { primaryColor } as Parameters<typeof updateBusiness.mutate>[0],
             {
               onSuccess: () => toast.success('Gespeichert'),
               onError: (e) => toast.error(e.message),
@@ -378,6 +405,154 @@ function AbonnementTab() {
   );
 }
 
+// ── WhatsApp ─────────────────────────────────────────────────────────────────
+function WhatsAppTab() {
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.patch('/businesses/me/whatsapp', { waPhoneNumberId: phoneNumberId, waAccessToken: accessToken }),
+    onSuccess: () => toast.success('WhatsApp-Einstellungen gespeichert'),
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="rounded-xl border bg-card p-5 space-y-4 max-w-lg">
+      <h2 className="font-semibold text-sm">Meta WhatsApp Cloud API</h2>
+      <p className="text-xs text-muted-foreground">
+        Nutze einen permanenten System-User-Token aus dem Meta Business Manager.
+        Token wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.
+      </p>
+      <div>
+        <label className="text-sm font-medium">Phone Number ID</label>
+        <input
+          value={phoneNumberId}
+          onChange={(e) => setPhoneNumberId(e.target.value)}
+          placeholder="1234567890"
+          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Access Token</label>
+        <input
+          type="password"
+          value={accessToken}
+          onChange={(e) => setAccessToken(e.target.value)}
+          placeholder="EAAxxxxx…"
+          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <button
+        onClick={() => save.mutate()}
+        disabled={save.isPending || !phoneNumberId || !accessToken}
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {save.isPending ? 'Wird gespeichert…' : 'Speichern'}
+      </button>
+    </div>
+  );
+}
+
+// ── Nachrichten ───────────────────────────────────────────────────────────────
+const MESSAGE_FIELDS: { key: string; label: string; hint: string }[] = [
+  {
+    key: 'not_registered',
+    label: 'Nicht registriert',
+    hint: 'Wird gesendet, wenn ein unbekannter Kontakt ein Keyword schreibt. Nutze {link} für den Registrierungslink.',
+  },
+  {
+    key: 'stamp_cooldown',
+    label: 'Cooldown-Hinweis',
+    hint: 'Wird bei zu frühem Keyword-Stempel gesendet. Nutze {hours} für die Wartezeit.',
+  },
+  {
+    key: 'stamp_issued',
+    label: 'Stempel erhalten',
+    hint: 'Benachrichtigung nach Stempel-Vergabe. Variablen: {count}, {total}, {stampCount}.',
+  },
+  {
+    key: 'reward_earned',
+    label: 'Belohnung erhalten',
+    hint: 'Benachrichtigung bei Belohnung. Variablen: {description}, {code}.',
+  },
+  {
+    key: 'opt_out_confirm',
+    label: 'Abmeldung bestätigt',
+    hint: 'Bestätigung nach Opt-out. Keine Variablen.',
+  },
+  {
+    key: 'opt_in_welcome',
+    label: 'Willkommensnachricht',
+    hint: 'Wird nach erfolgreicher Registrierung gesendet. Variablen: {name}, {businessName}.',
+  },
+];
+
+const DEFAULT_TEMPLATES: Record<string, string> = {
+  not_registered: 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉',
+  stamp_cooldown: 'Du hast heute bereits einen Stempel erhalten. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) verfügbar.',
+  stamp_issued: 'Du hast {count} Stempel erhalten! 🎉\n\n📍 Aktueller Stand: {total}/{stampCount} Stempel',
+  reward_earned: '🎉 Glückwunsch! Du hast deine Belohnung verdient!\n\n🎁 {description}\nDein Code: *{code}*\n\nZeige diesen Code beim nächsten Besuch vor.',
+  opt_out_confirm: 'Du wurdest erfolgreich vom Treueprogramm abgemeldet. Auf Wiedersehen! 👋',
+  opt_in_welcome: 'Willkommen bei {businessName}, {name}! 🎉\n\nDu bist jetzt Teil unseres Treueprogramms. Schreibe "Stempel" nach deinem nächsten Besuch, um deinen ersten Stempel zu sammeln!',
+};
+
+function NachrichtenTab() {
+  const { data: business } = useBusiness();
+  const updateBusiness = useUpdateBusiness();
+
+  const [templates, setTemplates] = useState<Record<string, string>>(() => ({
+    ...DEFAULT_TEMPLATES,
+    ...(business?.message_templates ?? {}),
+  }));
+
+  function handleSave() {
+    updateBusiness.mutate(
+      { messageTemplates: templates } as Parameters<typeof updateBusiness.mutate>[0],
+      {
+        onSuccess: () => toast.success('Nachrichten gespeichert'),
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-muted-foreground">
+        Passe die automatisch gesendeten WhatsApp-Nachrichten an. Platzhalter in geschwungenen Klammern werden beim Senden ersetzt.
+      </p>
+      {MESSAGE_FIELDS.map(({ key, label, hint }) => (
+        <div key={key} className="rounded-xl border bg-card p-4 space-y-2">
+          <div>
+            <p className="text-sm font-semibold">{label}</p>
+            <p className="text-xs text-muted-foreground">{hint}</p>
+          </div>
+          <textarea
+            rows={3}
+            value={templates[key] ?? DEFAULT_TEMPLATES[key] ?? ''}
+            onChange={(e) => setTemplates((prev) => ({ ...prev, [key]: e.target.value }))}
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+          />
+          <button
+            type="button"
+            onClick={() => setTemplates((prev) => ({ ...prev, [key]: DEFAULT_TEMPLATES[key] ?? '' }))}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            Zurücksetzen
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={handleSave}
+        disabled={updateBusiness.isPending}
+        className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {updateBusiness.isPending ? 'Wird gespeichert…' : 'Nachrichten speichern'}
+      </button>
+    </div>
+  );
+}
+
 // ── Hauptseite ───────────────────────────────────────────────────────────────
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -419,6 +594,8 @@ export function SettingsPage() {
       {activeTab === 'allgemein'        && <AllgemeinTab />}
       {activeTab === 'treuekarte'       && <TreuekartTab />}
       {activeTab === 'erscheinungsbild' && <ErscheinungsbildTab />}
+      {activeTab === 'whatsapp'         && <WhatsAppTab />}
+      {activeTab === 'nachrichten'      && <NachrichtenTab />}
       {activeTab === 'qrcode'           && <QrCodeTab />}
       {activeTab === 'abonnement'       && <AbonnementTab />}
     </div>

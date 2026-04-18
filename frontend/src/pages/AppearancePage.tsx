@@ -11,7 +11,7 @@ export function AppearancePage() {
 
   function handleSave() {
     updateBusiness.mutate(
-      { primary_color: primaryColor, reward_description: rewardDesc, stamps_per_reward: stampsPerReward } as Parameters<typeof updateBusiness.mutate>[0],
+      { primaryColor, rewardDescription: rewardDesc, stampsPerReward } as Parameters<typeof updateBusiness.mutate>[0],
       {
         onSuccess: () => toast.success('Einstellungen gespeichert'),
         onError: (e) => toast.error(e.message),

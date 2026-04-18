@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const UpdateBusinessSchema = z.object({
   businessName: z.string().min(2).max(100).optional(),
+  slug: z.string().regex(/^[a-z0-9-]+$/, 'Nur Kleinbuchstaben, Zahlen und Bindestriche').min(3).max(50).optional(),
   phoneDisplay: z.string().optional(),
   logoUrl: z.string().url().optional().nullable(),
   bannerUrl: z.string().url().optional().nullable(),
@@ -16,12 +17,14 @@ export const UpdateBusinessSchema = z.object({
       z.object({
         stamp: z.number().int().min(1).max(12),
         description: z.string().min(1).max(200),
+        emoji: z.string().max(10).optional(),
       }),
     )
     .min(1)
     .max(12)
     .optional(),
   timezone: z.string().optional(),
+  messageTemplates: z.record(z.string(), z.string().max(1000)).optional(),
 });
 
 export const UpdateWhatsAppSchema = z.object({

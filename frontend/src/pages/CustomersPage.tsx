@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
+import { useBusiness } from '@/hooks/useBusiness';
 import { formatDate } from '@/lib/utils';
 
 export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const { data, isLoading } = useCustomers({ ...(search ? { search } : {}), page, optedOut: 'false' });
+  const { data: business } = useBusiness();
   const navigate = useNavigate();
+  const stampCount = business?.stamp_count ?? 10;
 
   return (
     <div className="space-y-6">
@@ -48,7 +51,7 @@ export function CustomersPage() {
                 >
                   <td className="px-4 py-3 font-medium">{c.display_name ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.phone_display}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{c.total_stamps}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{c.total_stamps}/{stampCount}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground">{formatDate(c.opted_in_at)}</td>
                 </tr>
               ))

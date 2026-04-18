@@ -12,7 +12,7 @@ const SAFE_COLUMNS = [
   'stamps_per_reward', 'reward_description', 'stamp_count', 'reward_stages',
   'blast_count_this_week',
   'logo_url', 'banner_url', 'primary_color', 'secondary_color',
-  'youtube_url', 'timezone', 'locale', 'active', 'created_at', 'updated_at',
+  'youtube_url', 'timezone', 'locale', 'active', 'message_templates', 'created_at', 'updated_at',
 ].join(', ');
 
 export async function getMyBusiness(businessId: string): Promise<Partial<Business>> {
@@ -32,6 +32,7 @@ export async function updateBusiness(
 ): Promise<Partial<Business>> {
   const updates: Record<string, unknown> = {};
   if (input.businessName !== undefined) updates.business_name = input.businessName;
+  if (input.slug !== undefined) updates.slug = input.slug;
   if (input.phoneDisplay !== undefined) updates.phone_display = input.phoneDisplay;
   if (input.logoUrl !== undefined) updates.logo_url = input.logoUrl;
   if (input.bannerUrl !== undefined) updates.banner_url = input.bannerUrl;
@@ -43,6 +44,7 @@ export async function updateBusiness(
   if (input.stampCount !== undefined) updates.stamp_count = input.stampCount;
   if (input.rewardStages !== undefined) updates.reward_stages = input.rewardStages;
   if (input.timezone !== undefined) updates.timezone = input.timezone;
+  if (input.messageTemplates !== undefined) updates.message_templates = input.messageTemplates;
 
   const { data, error } = await supabase
     .from('businesses')
