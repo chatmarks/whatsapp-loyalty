@@ -74,6 +74,7 @@ async function handleInboundMessage(
     void supabase.from('wa_messages').insert({
       business_id: business.id,
       customer_id: msgCustomer?.id ?? null,
+      phone_hash: phoneHash,
       direction: 'inbound',
       body: msg.text.body,
       wa_message_id: msg.id,

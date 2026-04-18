@@ -83,11 +83,23 @@ export async function listMessages(
   const pageSize = 50;
   const offset = (page - 1) * pageSize;
 
+  // Get phone_hash to also find pre-registration messages (stored with customer_id: null)
+  const { data: custRow } = await supabase
+    .from('customers')
+    .select('phone_hash')
+    .eq('id', customerId)
+    .eq('business_id', businessId)
+    .maybeSingle();
+
+  const filter = custRow?.phone_hash
+    ? `customer_id.eq.${customerId},phone_hash.eq.${custRow.phone_hash}`
+    : `customer_id.eq.${customerId}`;
+
   const { data, count } = await supabase
     .from('wa_messages')
     .select('id, direction, body, status, created_at', { count: 'exact' })
     .eq('business_id', businessId)
-    .eq('customer_id', customerId)
+    .or(filter)
     .order('created_at', { ascending: false })
     .range(offset, offset + pageSize - 1);
 
@@ -106,13 +118,13 @@ export async function sendMessageToCustomer(
 ): Promise<void> {
   const { data: customer } = await supabase
     .from('customers')
-    .select('id, phone_enc')
+    .select('id, phone_enc, phone_hash, opted_out_at')
     .eq('id', customerId)
     .eq('business_id', business.id)
-    .is('opted_out_at', null)
     .single();
 
   if (!customer) throw new NotFoundError('Customer');
+  if (customer.opted_out_at) throw new Error('Customer has opted out');
 
   const { data: biz } = await supabase
     .from('businesses')
@@ -141,6 +153,7 @@ export async function sendMessageToCustomer(
   await supabase.from('wa_messages').insert({
     business_id: business.id,
     customer_id: customerId,
+    phone_hash: customer.phone_hash ?? null,
     direction: 'outbound',
     body,
     wa_message_id: waMessageId ?? null,
