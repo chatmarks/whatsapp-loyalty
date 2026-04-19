@@ -19,6 +19,7 @@ import { whatsappRouter } from './modules/whatsapp/whatsapp.router.js';
 import { paymentsRouter } from './modules/payments/payments.router.js';
 import { reportsRouter } from './modules/reports/reports.router.js';
 import { publicRouter } from './modules/public/public.router.js';
+import { chatRouter } from './modules/chat/chat.router.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -74,6 +75,7 @@ export function createApp(): express.Application {
   app.use('/api/v1/payments', paymentsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/public', publicRouter);
+  app.use('/api/v1/chat', chatRouter);
 
   app.use(errorHandler);
 

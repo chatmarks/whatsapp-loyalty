@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuth';
+import { useUnreadCount } from '@/hooks/useConversations';
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { label: 'Dashboard', to: '/', icon: LayoutDashboard, end: true },
+      { label: 'Chat', to: '/chat', icon: MessageSquare },
     ],
   },
   {
@@ -126,6 +128,7 @@ export function Sidebar() {
   const business = useAuthStore((s) => s.business);
   const logout = useLogout();
   const location = useLocation();
+  const unreadCount = useUnreadCount();
   const isOnSettings = location.pathname === '/settings';
   const [settingsOpen, setSettingsOpen] = useState(isOnSettings);
 
@@ -156,7 +159,29 @@ export function Sidebar() {
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.label}>
-                  <NavItemRow item={item} />
+                  {item.to === '/chat' ? (
+                    <NavLink
+                      to="/chat"
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                        )
+                      }
+                    >
+                      <MessageSquare className="h-4 w-4 shrink-0" />
+                      Chat
+                      {unreadCount > 0 && (
+                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  ) : (
+                    <NavItemRow item={item} />
+                  )}
                 </li>
               ))}
             </ul>

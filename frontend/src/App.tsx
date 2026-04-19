@@ -23,6 +23,7 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { PaymentsPage } from '@/pages/PaymentsPage';
 import { PublicRegistrationPage } from '@/pages/PublicRegistrationPage';
 import { CustomerWalletPage } from '@/pages/CustomerWalletPage';
+import { ChatListPage } from '@/pages/ChatListPage';
 
 // TODO: Auth guard re-enable when login flow is implemented
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="customers" element={<CustomersPage />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
         <Route path="customers/:id/chat" element={<CustomerChatPage />} />
+        <Route path="chat" element={<ChatListPage />} />
         <Route path="stamps" element={<StampsPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="orders/new" element={<NewOrderPage />} />
