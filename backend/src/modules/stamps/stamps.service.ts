@@ -71,7 +71,7 @@ export async function issueStamps(
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('stamp_count, reward_stages, stamps_per_reward, reward_description, wa_phone_number_id, wa_access_token_enc, slug')
+    .select('stamp_count, reward_stages, stamps_per_reward, reward_description, wa_phone_number_id, wa_access_token_enc, slug, primary_color')
     .eq('id', businessId)
     .single();
 
@@ -156,6 +156,10 @@ export async function issueStamps(
           ? `${env.CLIENT_URL}/r/${business.slug}/wallet/${customer.wallet_token}?new=1`
           : undefined;
 
+        const imageUrl = !rewardIssued && customer.wallet_token && env.BACKEND_URL
+          ? `${env.BACKEND_URL}/api/v1/public/stamp-image/${customer.wallet_token}`
+          : undefined;
+
         // Use the first crossed stage description for the reward message
         const firstStage = crossed[0];
         const template = rewardIssued && firstStage
@@ -171,6 +175,8 @@ export async function issueStamps(
               finalTotal,
               stampCount,
               walletUrl,
+              undefined,
+              imageUrl,
             );
 
         const { to: _to, ...templateBody } = template;

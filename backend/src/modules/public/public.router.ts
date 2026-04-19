@@ -38,7 +38,7 @@ publicRouter.get('/stamp-image/:walletToken', async (req: Request, res: Response
 
     const { data: biz } = await supabase
       .from('businesses')
-      .select('business_name, stamp_count')
+      .select('business_name, stamp_count, primary_color, reward_stages')
       .eq('id', customer.business_id)
       .single();
 
@@ -46,8 +46,10 @@ publicRouter.get('/stamp-image/:walletToken', async (req: Request, res: Response
 
     const png = generateStampCardPng(
       biz.business_name,
-      biz.stamp_count ?? 8,
-      customer.total_stamps ?? 0,
+      (biz.primary_color as string | null) ?? '#25D366',
+      (biz.stamp_count as number | null) ?? 8,
+      (customer.total_stamps as number | null) ?? 0,
+      (biz.reward_stages as Array<{ stamp: number; description: string; emoji?: string }> | null) ?? [],
     );
 
     res.setHeader('Content-Type', 'image/png');

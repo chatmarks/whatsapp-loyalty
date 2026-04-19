@@ -1,4 +1,4 @@
-import type { TemplateMessageRequest, TextMessageRequest, CtaUrlMessageRequest } from '../../types/whatsapp.js';
+import type { TemplateMessageRequest, TextMessageRequest, CtaUrlMessageRequest, ImageMessageRequest } from '../../types/whatsapp.js';
 
 const LANG = { code: 'de' };
 
@@ -7,7 +7,7 @@ const LANG = { code: 'de' };
 // Ohne walletUrl: einfacher Text-Fallback.
 // Sobald genehmigte Templates vorliegen, auf Template-Varianten umstellen.
 
-type OutboundMessage = TextMessageRequest | CtaUrlMessageRequest;
+type OutboundMessage = TextMessageRequest | CtaUrlMessageRequest | ImageMessageRequest;
 
 export function stampIssuedText(
   to: string,
@@ -16,6 +16,7 @@ export function stampIssuedText(
   stampsPerReward: number,
   walletUrl?: string,
   customBody?: string,
+  imageUrl?: string,
 ): OutboundMessage {
   const remaining = stampsPerReward - total;
   const body = customBody ??
@@ -31,10 +32,22 @@ export function stampIssuedText(
       type: 'interactive',
       interactive: {
         type: 'cta_url',
+        ...(imageUrl ? { header: { type: 'image' as const, image: { link: imageUrl } } } : {}),
         body: { text: body },
         action: { name: 'cta_url', parameters: { display_text: 'Stempelkarte öffnen', url: walletUrl } },
       },
     };
+  }
+
+  // No wallet URL but image available → image message with caption
+  if (imageUrl) {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'image',
+      image: { link: imageUrl, caption: body },
+    } as OutboundMessage;
   }
 
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };

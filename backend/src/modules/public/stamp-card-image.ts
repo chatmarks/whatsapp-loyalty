@@ -1,75 +1,171 @@
 import { Resvg } from '@resvg/resvg-js';
 
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+export interface RewardStage {
+  stamp: number;
+  description: string;
+  emoji?: string;
 }
 
-/** Generates a PNG buffer of a stamp card showing current progress. */
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// White checkmark path for a 24×24 viewBox
+const CHECKMARK = 'M5 13l4 4L19 7';
+// White star (★) for reward positions
+const STAR = 'M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17 5.8 21.3l2.4-7.4L2 9.4h7.6z';
+
 export function generateStampCardPng(
   businessName: string,
+  primaryColor: string,
   stampCount: number,
   currentStamps: number,
+  rewardStages: RewardStage[],
 ): Buffer {
-  const svg = buildSvg(businessName, stampCount, currentStamps);
+  const svg = buildSvg(businessName, primaryColor, stampCount, currentStamps, rewardStages);
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 640 } });
   return Buffer.from(resvg.render().asPng());
 }
 
-function buildSvg(businessName: string, stampCount: number, current: number): string {
-  // Layout: max 10 per row
-  const perRow = Math.min(10, stampCount);
-  const rows = Math.ceil(stampCount / perRow);
+function buildSvg(
+  businessName: string,
+  primaryColor: string,
+  stampCount: number,
+  current: number,
+  rewardStages: RewardStage[],
+): string {
   const W = 640;
-  const HEADER_H = 96;
-  const CIRCLE_D = Math.min(52, Math.floor((W - 80 - (perRow - 1) * 10) / perRow));
-  const ROW_GAP = 14;
-  const STAMPS_H = rows * CIRCLE_D + (rows - 1) * ROW_GAP;
-  const FOOTER_H = 56;
-  const H = HEADER_H + STAMPS_H + FOOTER_H + 24;
+  const COLS = Math.min(5, stampCount);
+  const ROWS = Math.ceil(stampCount / COLS);
+  const CIRCLE_D = 52;
+  const GAP = 8;
+  const HEADER_H = 88;
+  const CARD_PAD = 20;
+  const STAMPS_W = COLS * CIRCLE_D + (COLS - 1) * GAP;
+  const STAMPS_H = ROWS * CIRCLE_D + (ROWS - 1) * GAP;
+  const PROGRESS_H = 46;
+  const FOOTER_H = 28;
+  const CARD_H = CARD_PAD + 16 + 20 + CARD_PAD + STAMPS_H + PROGRESS_H + FOOTER_H + CARD_PAD;
+  const H = HEADER_H + CARD_H;
 
-  const circlesX = (W - (perRow * CIRCLE_D + (perRow - 1) * 10)) / 2;
-  const circlesY = HEADER_H + 12;
+  const rewardPositions = new Set(rewardStages.map((s) => s.stamp));
+  const AMBER = '#f59e0b';
+
+  // Next reward text
+  const nextReward = rewardStages
+    .filter((s) => s.stamp > current)
+    .sort((a, b) => a.stamp - b.stamp)[0];
+  const progressText = nextReward
+    ? `Noch ${nextReward.stamp - current} Stempel bis: ${esc(nextReward.description)}`
+    : 'Alle Belohnungen verdient!';
+  const progressPct = Math.min(100, Math.round((current / stampCount) * 100));
+
+  // Stamp circles
+  const startX = (W - STAMPS_W) / 2;
+  const stampsY = HEADER_H + CARD_PAD + 16 + 20 + CARD_PAD;
 
   const circles: string[] = [];
   for (let i = 0; i < stampCount; i++) {
-    const row = Math.floor(i / perRow);
-    const col = i % perRow;
-    const cx = circlesX + col * (CIRCLE_D + 10) + CIRCLE_D / 2;
-    const cy = circlesY + row * (CIRCLE_D + ROW_GAP) + CIRCLE_D / 2;
+    const row = Math.floor(i / COLS);
+    const col = i % COLS;
+    const cx = startX + col * (CIRCLE_D + GAP) + CIRCLE_D / 2;
+    const cy = stampsY + row * (CIRCLE_D + GAP) + CIRCLE_D / 2;
     const r = CIRCLE_D / 2;
-    const filled = i < current;
+    const pos = i + 1;
+    const filled = pos <= current;
+    const isReward = rewardPositions.has(pos);
+    const fillColor = isReward ? AMBER : primaryColor;
+    const borderColor = isReward ? `${AMBER}88` : `${primaryColor}40`;
+    const borderStyle = isReward ? `stroke-dasharray="4 3"` : '';
+
     if (filled) {
-      // Filled: solid green circle with white inner dot
-      circles.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#16a34a"/>`);
-      circles.push(`<circle cx="${cx}" cy="${cy}" r="${r * 0.32}" fill="white" opacity="0.9"/>`);
+      circles.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fillColor}" filter="url(#shadow)"/>`);
+      if (isReward) {
+        // Star for reward
+        circles.push(
+          `<g transform="translate(${cx - 12},${cy - 12})">` +
+          `<path d="${STAR}" fill="white" stroke="none"/>` +
+          `</g>`,
+        );
+      } else {
+        // Checkmark
+        circles.push(
+          `<g transform="translate(${cx - 11},${cy - 11})">` +
+          `<path d="${CHECKMARK}" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+          `</g>`,
+        );
+      }
     } else {
-      // Empty: light outline
-      circles.push(`<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="#f9fafb" stroke="#d1d5db" stroke-width="2"/>`);
+      circles.push(
+        `<circle cx="${cx}" cy="${cy}" r="${r - 1}" fill="${isReward ? '#fffbeb' : '#f9fafb'}" ` +
+        `stroke="${borderColor}" stroke-width="2" ${borderStyle} opacity="${isReward ? 0.7 : 0.6}"/>`,
+      );
     }
   }
 
-  const remaining = stampCount - current;
-  const progressLine = remaining > 0
-    ? `${current} / ${stampCount} Stempel  -  Noch ${remaining} bis zur Belohnung`
-    : `Alle ${stampCount} Stempel gesammelt!`;
+  // Progress bar y position
+  const barY = stampsY + STAMPS_H + 18;
+  const barW = W - 80;
+  const fillW = Math.max(4, Math.round((progressPct / 100) * barW));
+
+  const initial = businessName.charAt(0).toUpperCase();
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="${W}" height="${H}" rx="18" fill="#f0fdf4"/>
-  <rect x="2" y="2" width="${W - 4}" height="${H - 4}" rx="17" fill="none" stroke="#16a34a" stroke-width="2.5"/>
-  <text x="${W / 2}" y="44" text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="bold" fill="#15803d"
-  >${escapeXml(businessName)}</text>
-  <text x="${W / 2}" y="70" text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6b7280"
+  <defs>
+    <linearGradient id="hdr" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${primaryColor}"/>
+      <stop offset="100%" stop-color="${primaryColor}cc"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${primaryColor}"/>
+      <stop offset="100%" stop-color="${primaryColor}99"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="${primaryColor}" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Header gradient -->
+  <rect width="${W}" height="${H}" rx="0" fill="#f5f5f5"/>
+  <rect width="${W}" height="${HEADER_H}" fill="url(#hdr)"/>
+  <!-- Decorative circles in header -->
+  <circle cx="${W + 20}" cy="-20" r="100" fill="rgba(255,255,255,0.07)"/>
+  <circle cx="${W - 30}" cy="20" r="50" fill="rgba(255,255,255,0.05)"/>
+  <!-- Business initial badge -->
+  <rect x="24" y="20" width="44" height="44" rx="12" fill="rgba(255,255,255,0.22)"/>
+  <text x="46" y="49" text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800" fill="white"
+  >${esc(initial)}</text>
+  <!-- Business name -->
+  <text x="80" y="36"
+    font-family="Arial, Helvetica, sans-serif" font-size="12" fill="rgba(255,255,255,0.75)"
   >Stempelkarte</text>
-  <line x1="40" y1="84" x2="${W - 40}" y2="84" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="80" y="56"
+    font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="white"
+  >${esc(businessName)}</text>
+
+  <!-- Card body -->
+  <rect x="0" y="${HEADER_H}" width="${W}" height="${CARD_H}" fill="white"/>
+
+  <!-- "Treuekarte" header row -->
+  <text x="${CARD_PAD}" y="${HEADER_H + CARD_PAD + 14}"
+    font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#1a1a1a"
+  >Treuekarte</text>
+  <text x="${W - CARD_PAD}" y="${HEADER_H + CARD_PAD + 14}" text-anchor="end"
+    font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#888"
+  >${current} von ${stampCount} Stempeln</text>
+
+  <!-- Stamps -->
   ${circles.join('\n  ')}
-  <text x="${W / 2}" y="${H - 18}" text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#374151"
-  >${escapeXml(progressLine)}</text>
+
+  <!-- Progress bar track -->
+  <rect x="40" y="${barY}" width="${barW}" height="6" rx="3" fill="#f0f0f0"/>
+  <!-- Progress bar fill -->
+  <rect x="40" y="${barY}" width="${fillW}" height="6" rx="3" fill="url(#bar)"/>
+
+  <!-- Next reward text -->
+  <text x="${W / 2}" y="${barY + 26}" text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#aaa"
+  >${progressText}</text>
 </svg>`;
 }

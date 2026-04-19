@@ -89,6 +89,8 @@ export interface CtaUrlMessageRequest {
   type: 'interactive';
   interactive: {
     type: 'cta_url';
+    // Optional image header — shown above the message body
+    header?: { type: 'image'; image: { link: string } };
     body: { text: string };
     footer?: { text: string };
     action: {

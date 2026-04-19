@@ -250,6 +250,10 @@ async function handleKeywordStamp(
     ? `${env.CLIENT_URL}/r/${business.slug}/wallet/${customer.wallet_token}?new=1`
     : undefined;
 
+  const imageUrl = !rewardIssued && customer.wallet_token && env.BACKEND_URL
+    ? `${env.BACKEND_URL}/api/v1/public/stamp-image/${customer.wallet_token}`
+    : undefined;
+
   const firstStage = crossed[0];
 
   // Apply custom template body if configured, else use default
@@ -266,22 +270,7 @@ async function handleKeywordStamp(
       .replace('{total}', String(finalTotal))
       .replace('{stampCount}', String(stampCount))
       .replace('{remaining}', String(remaining));
-    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody);
-  }
-
-  // Send stamp-card image before the text confirmation (only for stamp events, not rewards)
-  if (!rewardIssued && customer.wallet_token && env.BACKEND_URL) {
-    const imageUrl = `${env.BACKEND_URL}/api/v1/public/stamp-image/${customer.wallet_token}`;
-    const { to: _imgTo, ...imgBody } = {
-      messaging_product: 'whatsapp' as const,
-      recipient_type: 'individual' as const,
-      to: e164,
-      type: 'image' as const,
-      image: { link: imageUrl },
-    };
-    await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, imgBody).catch(
-      (err) => logger.warn({ err }, 'Stamp-card image send failed — continuing without image'),
-    );
+    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody, imageUrl);
   }
 
   const { to: _to, ...msgBody } = msgObj;
