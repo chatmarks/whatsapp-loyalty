@@ -71,7 +71,7 @@ async function handleInboundMessage(
     .maybeSingle();
 
   if (msg.type === 'text' && msg.text) {
-    void supabase.from('wa_messages').insert({
+    const { error: insertError } = await supabase.from('wa_messages').insert({
       business_id: business.id,
       customer_id: msgCustomer?.id ?? null,
       phone_hash: phoneHash,
@@ -79,7 +79,10 @@ async function handleInboundMessage(
       body: msg.text.body,
       wa_message_id: msg.id,
       status: 'delivered',
-    }); // fire-and-forget, non-blocking
+    });
+    if (insertError) {
+      logger.error({ insertError, msgId: msg.id }, 'Failed to store inbound message');
+    }
   }
 
   if (msg.type !== 'text' || !msg.text) return;
