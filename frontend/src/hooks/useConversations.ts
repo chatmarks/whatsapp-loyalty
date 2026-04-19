@@ -14,6 +14,23 @@ export interface Conversation {
   unread: boolean;
 }
 
+const STORAGE_KEY = 'chat_seen';
+
+function getSeenMap(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** Call when a chat is opened — marks the conversation as read. */
+export function markConversationSeen(customerId: string): void {
+  const map = getSeenMap();
+  map[customerId] = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+
 export function useConversations() {
   return useQuery({
     queryKey: ['conversations'],
@@ -22,7 +39,15 @@ export function useConversations() {
   });
 }
 
-export function useUnreadCount() {
+/** Returns true if there is at least one conversation with a newer inbound message than last seen. */
+export function useHasUnread(): boolean {
   const { data } = useConversations();
-  return (data?.data ?? []).filter((c) => c.unread).length;
+  if (!data?.data.length) return false;
+  const seen = getSeenMap();
+  return data.data.some((c) => {
+    if (!c.unread) return false;
+    const lastSeen = seen[c.customer_id];
+    if (!lastSeen) return true;
+    return new Date(c.last_message_at) > new Date(lastSeen);
+  });
 }

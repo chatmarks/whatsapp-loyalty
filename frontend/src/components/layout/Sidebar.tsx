@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuth';
-import { useUnreadCount } from '@/hooks/useConversations';
+import { useHasUnread } from '@/hooks/useConversations';
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ export function Sidebar() {
   const business = useAuthStore((s) => s.business);
   const logout = useLogout();
   const location = useLocation();
-  const unreadCount = useUnreadCount();
+  const hasUnread = useHasUnread();
   const isOnSettings = location.pathname === '/settings';
   const [settingsOpen, setSettingsOpen] = useState(isOnSettings);
 
@@ -173,10 +173,8 @@ export function Sidebar() {
                     >
                       <MessageSquare className="h-4 w-4 shrink-0" />
                       Chat
-                      {unreadCount > 0 && (
-                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1">
-                          {unreadCount}
-                        </span>
+                      {hasUnread && (
+                        <span className="ml-auto h-2 w-2 rounded-full bg-primary" />
                       )}
                     </NavLink>
                   ) : (

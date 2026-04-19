@@ -4,6 +4,7 @@ import { ArrowLeft, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomer } from '@/hooks/useCustomers';
 import { useMessages, useSendMessage } from '@/hooks/useMessages';
+import { markConversationSeen } from '@/hooks/useConversations';
 import { cn } from '@/lib/utils';
 
 function formatTime(iso: string) {
@@ -31,6 +32,11 @@ export function CustomerChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messages = [...(data?.data ?? [])].reverse(); // API returns newest-first, reverse for display
+
+  // Mark conversation as read when the chat is opened or new messages arrive
+  useEffect(() => {
+    if (id) markConversationSeen(id);
+  }, [id, messages.length]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

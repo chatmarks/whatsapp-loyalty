@@ -25,6 +25,9 @@ const EnvSchema = z.object({
 
   // App
   CLIENT_URL: z.string().url(),
+  // Public URL of this backend — used to build stamp-card image links sent via WhatsApp.
+  // Set to your Railway backend URL (e.g. https://my-app.railway.app). Optional.
+  BACKEND_URL: z.string().url().optional(),
 
   // Dev only — bypass JWT auth when set; never set in production
   DEV_BUSINESS_ID: z.string().uuid().optional(),

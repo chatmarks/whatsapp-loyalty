@@ -101,7 +101,18 @@ export interface CtaUrlMessageRequest {
   };
 }
 
-export type SendMessageRequest = TextMessageRequest | TemplateMessageRequest | CtaUrlMessageRequest;
+export interface ImageMessageRequest {
+  messaging_product: 'whatsapp';
+  recipient_type: 'individual';
+  to: string;
+  type: 'image';
+  image: {
+    link: string;
+    caption?: string;
+  };
+}
+
+export type SendMessageRequest = TextMessageRequest | TemplateMessageRequest | CtaUrlMessageRequest | ImageMessageRequest;
 
 export interface SendMessageResponse {
   messaging_product: 'whatsapp';
