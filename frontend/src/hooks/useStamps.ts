@@ -7,7 +7,7 @@ export interface StampEvent {
   amount: number;
   source: 'manual' | 'order' | 'referral' | 'keyword';
   created_at: string;
-  customer: { id: string; display_name: string | null } | null;
+  customer: { id: string; display_name: string | null; wa_contact_name: string | null } | null;
 }
 
 export function useStampEvents(page = 1) {

@@ -256,13 +256,14 @@ async function handleKeywordStamp(
 
   const firstStage = crossed[0];
 
-  // Apply custom template body if configured, else use default
+  // Apply custom template body/CTA if configured, else use defaults
   let msgObj;
   if (rewardIssued && firstStage) {
     const customBody = customTemplates['reward_earned']
       ?.replace('{description}', firstStage.description)
       .replace('{code}', voucherCodes.join(', '));
-    msgObj = rewardEarnedText(e164, voucherCodes.join(', '), firstStage.description, walletUrl, customBody);
+    const ctaLabel = customTemplates['reward_earned_cta'] ?? undefined;
+    msgObj = rewardEarnedText(e164, voucherCodes.join(', '), firstStage.description, walletUrl, customBody, ctaLabel);
   } else {
     const remaining = stampCount - finalTotal;
     const customBody = customTemplates['stamp_issued']
@@ -270,7 +271,8 @@ async function handleKeywordStamp(
       .replace('{total}', String(finalTotal))
       .replace('{stampCount}', String(stampCount))
       .replace('{remaining}', String(remaining));
-    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody, imageUrl);
+    const ctaLabel = customTemplates['stamp_issued_cta'] ?? undefined;
+    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody, imageUrl, ctaLabel);
   }
 
   const { to: _to, ...msgBody } = msgObj;

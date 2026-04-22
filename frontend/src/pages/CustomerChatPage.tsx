@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, Stamp, Gift, LogIn, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomer } from '@/hooks/useCustomers';
 import { useMessages, useSendMessage } from '@/hooks/useMessages';
+import { useCustomerActivity } from '@/hooks/useCustomerActivity';
 import { markConversationSeen } from '@/hooks/useConversations';
 import { cn } from '@/lib/utils';
+import type { WaMessage } from '@/hooks/useMessages';
+import type { ActivityEvent } from '@/hooks/useCustomerActivity';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString('de-DE', {
@@ -23,15 +26,39 @@ const STATUS_ICONS: Record<string, string> = {
   failed:    '✗',
 };
 
+const EVENT_META: Record<string, { label: string; Icon: React.ElementType; color: string }> = {
+  stamp_issued:   { label: 'Stempel vergeben',   Icon: Stamp,  color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  voucher_issued: { label: 'Belohnung erhalten',  Icon: Gift,   color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  opt_in:         { label: 'Opt-in',              Icon: LogIn,  color: 'text-green-600 bg-green-50 border-green-200' },
+  opt_out:        { label: 'Opt-out',             Icon: LogOut, color: 'text-red-600 bg-red-50 border-red-200' },
+  blast:          { label: 'Broadcast gesendet',  Icon: Send,   color: 'text-violet-600 bg-violet-50 border-violet-200' },
+};
+
+type ChatItem =
+  | { kind: 'message'; data: WaMessage }
+  | { kind: 'event';   data: ActivityEvent };
+
+function mergeSorted(messages: WaMessage[], events: ActivityEvent[]): ChatItem[] {
+  const items: ChatItem[] = [
+    ...messages.map((m): ChatItem => ({ kind: 'message', data: m })),
+    ...events.map((e): ChatItem  => ({ kind: 'event',   data: e })),
+  ];
+  return items.sort(
+    (a, b) => new Date(a.data.created_at).getTime() - new Date(b.data.created_at).getTime(),
+  );
+}
+
 export function CustomerChatPage() {
   const { id } = useParams<{ id: string }>();
   const { data: customer } = useCustomer(id ?? '');
   const { data, isLoading } = useMessages(id ?? '');
+  const { data: activity } = useCustomerActivity(id ?? '');
   const sendMessage = useSendMessage(id ?? '');
   const [text, setText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const messages = [...(data?.data ?? [])].reverse(); // API returns newest-first, reverse for display
+  const messages = [...(data?.data ?? [])].reverse(); // API newest-first → oldest-first
+  const items = mergeSorted(messages, activity ?? []);
 
   // Mark conversation as read when the chat is opened or new messages arrive
   useEffect(() => {
@@ -40,7 +67,7 @@ export function CustomerChatPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [items.length]);
 
   function handleSend() {
     const body = text.trim();
@@ -83,44 +110,67 @@ export function CustomerChatPage() {
         {isLoading && (
           <p className="text-center text-sm text-muted-foreground py-8">Wird geladen…</p>
         )}
-        {!isLoading && messages.length === 0 && (
+        {!isLoading && items.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-8">
             Noch keine Nachrichten. Sende die erste Nachricht!
           </p>
         )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              'flex',
-              msg.direction === 'outbound' ? 'justify-end' : 'justify-start',
-            )}
-          >
+
+        {items.map((item) => {
+          if (item.kind === 'event') {
+            const evt = item.data;
+            const meta = EVENT_META[evt.event_type];
+            if (!meta) return null;
+            const { Icon, label, color } = meta;
+            return (
+              <div key={`evt-${evt.id}`} className="flex justify-center">
+                <div className={cn(
+                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium',
+                  color,
+                )}>
+                  <Icon className="h-3 w-3" />
+                  <span>{label}</span>
+                  <span className="opacity-60">· {formatTime(evt.created_at)}</span>
+                </div>
+              </div>
+            );
+          }
+
+          const msg = item.data;
+          return (
             <div
+              key={`msg-${msg.id}`}
               className={cn(
-                'max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm',
-                msg.direction === 'outbound'
-                  ? 'bg-primary text-primary-foreground rounded-br-sm'
-                  : 'bg-card text-foreground rounded-bl-sm border',
+                'flex',
+                msg.direction === 'outbound' ? 'justify-end' : 'justify-start',
               )}
             >
-              <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
               <div
                 className={cn(
-                  'flex items-center gap-1 mt-1 text-[10px]',
-                  msg.direction === 'outbound' ? 'text-primary-foreground/70 justify-end' : 'text-muted-foreground',
+                  'max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm',
+                  msg.direction === 'outbound'
+                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                    : 'bg-card text-foreground rounded-bl-sm border',
                 )}
               >
-                <span>{formatTime(msg.created_at)}</span>
-                {msg.direction === 'outbound' && (
-                  <span className={cn(msg.status === 'read' ? 'text-blue-300' : '')}>
-                    {STATUS_ICONS[msg.status] ?? '✓'}
-                  </span>
-                )}
+                <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                <div
+                  className={cn(
+                    'flex items-center gap-1 mt-1 text-[10px]',
+                    msg.direction === 'outbound' ? 'text-primary-foreground/70 justify-end' : 'text-muted-foreground',
+                  )}
+                >
+                  <span>{formatTime(msg.created_at)}</span>
+                  {msg.direction === 'outbound' && (
+                    <span className={cn(msg.status === 'read' ? 'text-blue-300' : '')}>
+                      {STATUS_ICONS[msg.status] ?? '✓'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 

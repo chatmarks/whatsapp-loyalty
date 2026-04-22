@@ -17,6 +17,7 @@ export function stampIssuedText(
   walletUrl?: string,
   customBody?: string,
   imageUrl?: string,
+  ctaLabel?: string,
 ): OutboundMessage {
   const remaining = stampsPerReward - total;
   const body = customBody ??
@@ -34,7 +35,7 @@ export function stampIssuedText(
         type: 'cta_url',
         ...(imageUrl ? { header: { type: 'image' as const, image: { link: imageUrl } } } : {}),
         body: { text: body },
-        action: { name: 'cta_url', parameters: { display_text: 'Stempelkarte öffnen', url: walletUrl } },
+        action: { name: 'cta_url', parameters: { display_text: ctaLabel ?? 'Stempelkarte öffnen', url: walletUrl } },
       },
     };
   }
@@ -59,6 +60,7 @@ export function rewardEarnedText(
   description: string,
   walletUrl?: string,
   customBody?: string,
+  ctaLabel?: string,
 ): OutboundMessage {
   const body = customBody ??
     `🎉 Glückwunsch! Du hast deine Belohnung verdient!\n\n` +
@@ -75,7 +77,7 @@ export function rewardEarnedText(
       interactive: {
         type: 'cta_url',
         body: { text: body },
-        action: { name: 'cta_url', parameters: { display_text: 'Gutschein ansehen', url: walletUrl } },
+        action: { name: 'cta_url', parameters: { display_text: ctaLabel ?? 'Gutschein ansehen', url: walletUrl } },
       },
     };
   }

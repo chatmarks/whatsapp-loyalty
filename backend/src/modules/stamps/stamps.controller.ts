@@ -20,7 +20,7 @@ export async function listHandler(req: Request, res: Response, next: NextFunctio
 
     const { data, count } = await supabase
       .from('stamp_events')
-      .select('id, amount, source, created_at, customer:customers(id, display_name)', { count: 'exact' })
+      .select('id, amount, source, created_at, customer:customers(id, display_name, wa_contact_name)', { count: 'exact' })
       .eq('business_id', req.business.id)
       .order('created_at', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);

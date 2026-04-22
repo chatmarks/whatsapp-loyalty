@@ -42,6 +42,16 @@ export async function listMessagesHandler(req: Request, res: Response, next: Nex
   }
 }
 
+export async function listActivityHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const customerId = req.params['id'] as string;
+    const result = await CustomerService.listActivity(req.business.id, customerId);
+    res.json({ data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 const SendMessageSchema = z.object({ body: z.string().min(1).max(4096) });
 
 export async function sendMessageHandler(req: Request, res: Response, next: NextFunction): Promise<void> {

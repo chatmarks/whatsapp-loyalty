@@ -75,7 +75,7 @@ export function StampsPage() {
             {data?.data.map((event) => (
               <tr key={event.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">
-                  {event.customer?.display_name ?? <span className="text-muted-foreground">Unbekannt</span>}
+                  {event.customer?.display_name ?? event.customer?.wa_contact_name ?? <span className="text-muted-foreground">Unbekannt</span>}
                 </td>
                 <td className="px-4 py-3">
                   <span className="font-semibold text-amber-600">+{event.amount}</span>

@@ -161,6 +161,28 @@ export async function sendMessageToCustomer(
   });
 }
 
+export interface ActivityEvent {
+  id: string;
+  event_type: string;
+  created_at: string;
+}
+
+/** Returns the last 200 automation events for a customer (newest-first). */
+export async function listActivity(
+  businessId: string,
+  customerId: string,
+): Promise<ActivityEvent[]> {
+  const { data } = await supabase
+    .from('notification_logs')
+    .select('id, event_type, created_at')
+    .eq('business_id', businessId)
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  return (data ?? []) as ActivityEvent[];
+}
+
 /**
  * DSGVO deletion: anonymise PII in-place, retain business analytics.
  * Hard-delete scheduled after 30-day retention by a cron job.

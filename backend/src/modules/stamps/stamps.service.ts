@@ -71,7 +71,7 @@ export async function issueStamps(
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('stamp_count, reward_stages, stamps_per_reward, reward_description, wa_phone_number_id, wa_access_token_enc, slug, primary_color')
+    .select('stamp_count, reward_stages, stamps_per_reward, reward_description, wa_phone_number_id, wa_access_token_enc, slug, primary_color, message_templates')
     .eq('id', businessId)
     .single();
 
@@ -149,8 +149,9 @@ export async function issueStamps(
   if (input.notifyWhatsApp) {
     const notifyAsync = async (): Promise<void> => {
       try {
-        const { wa_phone_number_id, wa_access_token_enc } = business;
+        const { wa_phone_number_id, wa_access_token_enc, message_templates } = business;
         if (!wa_phone_number_id || !wa_access_token_enc) return;
+        const customTemplates = (message_templates as Record<string, string> | null) ?? {};
 
         const walletUrl = customer.wallet_token && business.slug
           ? `${env.CLIENT_URL}/r/${business.slug}/wallet/${customer.wallet_token}?new=1`
@@ -168,6 +169,8 @@ export async function issueStamps(
               voucherCodes.join(', '),
               firstStage.description,
               walletUrl,
+              undefined,
+              customTemplates['reward_earned_cta'] ?? undefined,
             )
           : stampIssuedText(
               customer.phone_enc,
@@ -177,6 +180,7 @@ export async function issueStamps(
               walletUrl,
               undefined,
               imageUrl,
+              customTemplates['stamp_issued_cta'] ?? undefined,
             );
 
         const { to: _to, ...templateBody } = template;
