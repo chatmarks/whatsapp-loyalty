@@ -16,7 +16,7 @@ export interface Conversation {
 
 const STORAGE_KEY = 'chat_seen';
 
-function getSeenMap(): Record<string, string> {
+export function getSeenMap(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, string>;
   } catch {

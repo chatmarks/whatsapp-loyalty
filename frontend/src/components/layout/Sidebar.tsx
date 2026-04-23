@@ -6,12 +6,9 @@ import {
   Stamp,
   ShoppingCart,
   Package,
-  Ticket,
-  Star,
+  Gift,
   MessageSquare,
-  BarChart3,
   Settings,
-  Bell,
   LogOut,
   ChevronDown,
   Palette,
@@ -22,7 +19,6 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuth';
-import { useHasUnread } from '@/hooks/useConversations';
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -45,45 +41,31 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { label: 'Dashboard', to: '/', icon: LayoutDashboard, end: true },
-      { label: 'Chat', to: '/chat', icon: MessageSquare },
     ],
   },
   {
     label: 'Kunden & Treue',
     items: [
-      { label: 'Kunden',     to: '/customers', icon: Users },
-      { label: 'Stempel',    to: '/stamps',    icon: Stamp },
-      { label: 'Gutscheine', to: '/vouchers',  icon: Ticket },
+      { label: 'Kunden',      to: '/customers', icon: Users },
+      { label: 'Stempel',     to: '/stamps',    icon: Stamp },
+      { label: 'Belohnungen', to: '/rewards',   icon: Gift },
+      { label: 'Broadcasts',  to: '/blasts',    icon: MessageSquare },
     ],
   },
   {
     label: 'Verkauf',
     items: [
-      { label: 'Bestellungen', to: '/orders',   icon: ShoppingCart },
-      { label: 'Produkte',     to: '/products', icon: Package },
-    ],
-  },
-  {
-    label: 'Analyse',
-    items: [
-      { label: 'Berichte',  to: '/reports', icon: BarChart3 },
-      { label: 'Protokoll', to: '/logs',    icon: Bell },
-    ],
-  },
-  {
-    label: 'Demnächst',
-    items: [
-      { label: 'Mitgliedschaft', icon: Star,           comingSoon: true },
-      { label: 'Kampagnen',      icon: MessageSquare,  comingSoon: true },
+      { label: 'Bestellungen', icon: ShoppingCart, comingSoon: true },
+      { label: 'Produkte',     icon: Package,      comingSoon: true },
     ],
   },
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
-  { label: 'Allgemein',        to: '/settings',                    icon: SlidersHorizontal },
+  { label: 'Allgemein',        to: '/settings',                      icon: SlidersHorizontal },
   { label: 'Erscheinungsbild', to: '/settings?tab=erscheinungsbild', icon: Palette },
-  { label: 'QR-Code',          to: '/settings?tab=qrcode',          icon: QrCode },
-  { label: 'Abonnement',       to: '/settings?tab=abonnement',      icon: CreditCard },
+  { label: 'QR-Code',          to: '/settings?tab=qrcode',           icon: QrCode },
+  { label: 'Abonnement',       to: '/settings?tab=abonnement',       icon: CreditCard },
 ];
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -128,7 +110,6 @@ export function Sidebar() {
   const business = useAuthStore((s) => s.business);
   const logout = useLogout();
   const location = useLocation();
-  const hasUnread = useHasUnread();
   const isOnSettings = location.pathname === '/settings';
   const [settingsOpen, setSettingsOpen] = useState(isOnSettings);
 
@@ -159,27 +140,7 @@ export function Sidebar() {
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.label}>
-                  {item.to === '/chat' ? (
-                    <NavLink
-                      to="/chat"
-                      className={({ isActive }) =>
-                        cn(
-                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-                        )
-                      }
-                    >
-                      <MessageSquare className="h-4 w-4 shrink-0" />
-                      Chat
-                      {hasUnread && (
-                        <span className="ml-auto h-2 w-2 rounded-full bg-primary" />
-                      )}
-                    </NavLink>
-                  ) : (
-                    <NavItemRow item={item} />
-                  )}
+                  <NavItemRow item={item} />
                 </li>
               ))}
             </ul>
@@ -189,7 +150,6 @@ export function Sidebar() {
 
       {/* Einstellungen + Abmelden */}
       <div className="border-t p-2 space-y-0.5">
-        {/* Einstellungen Toggle */}
         <button
           onClick={() => setSettingsOpen((o) => !o)}
           className={cn(
@@ -206,7 +166,6 @@ export function Sidebar() {
           />
         </button>
 
-        {/* Untermenü */}
         {settingsOpen && (
           <ul className="ml-4 space-y-0.5 border-l pl-2">
             {SETTINGS_ITEMS.map((item) => (
@@ -230,7 +189,6 @@ export function Sidebar() {
           </ul>
         )}
 
-        {/* Abmelden */}
         <button
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
