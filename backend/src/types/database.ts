@@ -24,7 +24,8 @@ export interface Business {
   business_name: string;
   slug: string;
   phone_display: string | null;
-  wa_phone_number_id: string | null;
+  wa_phone_number_id: string | null;   // Meta internal ID (used for Graph API calls)
+  wa_phone_number: string | null;       // Actual E.164 number without + (used for wa.me links)
   wa_access_token_enc: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;

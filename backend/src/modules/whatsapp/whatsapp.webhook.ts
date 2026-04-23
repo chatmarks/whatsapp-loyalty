@@ -2,23 +2,32 @@ import { supabase } from '../../config/supabase.js';
 import { hashPhone, encryptPhone } from '../../lib/crypto.js';
 import { logger } from '../../lib/logger.js';
 import { findBusinessByWaPhoneId, sendMessage } from './whatsapp.service.js';
-import { optOutConfirmText } from './whatsapp.templates.js';
+import { optOutConfirmText, optInWelcomeText } from './whatsapp.templates.js';
 import { createStampRequest } from '../stamp-requests/stamp-requests.service.js';
 import type { WebhookPayload, InboundMessage, MessageStatus } from '../../types/whatsapp.js';
+import { env } from '../../config/env.js';
 
 const OPT_OUT_KEYWORDS = new Set(['stop', 'abmelden', 'nein', 'stopp']);
 const STAMP_KEYWORDS   = new Set(['stempel', 'stamp']);
+// Keyword sent by the QR redirect page for new registrations
+const OPT_IN_KEYWORDS  = new Set(['anmelden']);
 
 export async function handleWebhookPayload(payload: WebhookPayload): Promise<void> {
   for (const entry of payload.entry) {
     for (const change of entry.changes) {
       if (change.field !== 'messages') continue;
 
-      const { metadata, messages, statuses } = change.value;
+      const { metadata, messages, statuses, contacts } = change.value;
+
+      // Build phone → contact name map from webhook contacts array
+      const contactNames = new Map(
+        (contacts ?? []).map((c) => [c.wa_id, c.profile.name]),
+      );
 
       if (messages) {
         for (const msg of messages) {
-          await handleInboundMessage(msg, metadata.phone_number_id).catch((err) => {
+          const contactName = contactNames.get(msg.from) ?? null;
+          await handleInboundMessage(msg, metadata.phone_number_id, contactName).catch((err) => {
             logger.error({ err, msgId: msg.id }, 'Error handling inbound message');
           });
         }
@@ -38,6 +47,7 @@ export async function handleWebhookPayload(payload: WebhookPayload): Promise<voi
 async function handleInboundMessage(
   msg: InboundMessage,
   phoneNumberId: string,
+  contactName: string | null,
 ): Promise<void> {
   // Dedup: wa_message_id is PRIMARY KEY — duplicate insert returns 23505
   const { error: dedupError } = await supabase
@@ -84,14 +94,25 @@ async function handleInboundMessage(
 
   if (msg.type !== 'text' || !msg.text) return;
 
-  const text = msg.text.body.trim().toLowerCase();
+  const rawText  = msg.text.body.trim();
+  const textLow  = rawText.toLowerCase();
 
-  if (OPT_OUT_KEYWORDS.has(text)) {
+  if (OPT_OUT_KEYWORDS.has(textLow)) {
     await handleOptOut(msg.from, business.id, phoneNumberId);
     return;
   }
 
-  if (STAMP_KEYWORDS.has(text)) {
+  // Extract optional referral code embedded in message: "Anmelden REF:1234"
+  const refMatch     = rawText.match(/\bREF:(\w+)/i);
+  const referralCode = refMatch?.[1] ?? null;
+  const baseText     = textLow.replace(/\s+ref:\w+/i, '').trim();
+
+  if (OPT_IN_KEYWORDS.has(baseText)) {
+    await handleOptIn(msg.from, business, phoneNumberId, contactName, referralCode);
+    return;
+  }
+
+  if (STAMP_KEYWORDS.has(textLow)) {
     await handleKeywordStamp(msg.from, business, phoneNumberId);
     return;
   }
@@ -99,9 +120,160 @@ async function handleInboundMessage(
   logger.info({ businessId: business.id }, 'Inbound text received (non-keyword)');
 }
 
+// ── Registrierung via WhatsApp ────────────────────────────────────────────────
+// Triggered by the QR-redirect page pre-filling "Anmelden" in the WA message.
+// No web form — name comes from the WhatsApp contact profile.
+
+interface OptInBusiness {
+  id: string;
+  slug: string;
+  stamp_count: number;
+  stamps_per_reward: number;
+}
+
+async function handleOptIn(
+  fromPhone: string,
+  business: OptInBusiness,
+  phoneNumberId: string,
+  contactName: string | null,
+  referralCode: string | null,
+): Promise<void> {
+  const e164      = `+${fromPhone}`;
+  const phoneHash = hashPhone(e164);
+  const phoneEnc  = encryptPhone(e164);
+
+  const { data: biz } = await supabase
+    .from('businesses')
+    .select('wa_access_token_enc, business_name, slug, message_templates')
+    .eq('id', business.id)
+    .single();
+
+  if (!biz?.wa_access_token_enc) return;
+
+  const templates  = (biz.message_templates as Record<string, string> | null) ?? {};
+  const sendText   = async (body: string): Promise<void> => {
+    const { to: _to, ...msg } = {
+      messaging_product: 'whatsapp' as const,
+      recipient_type: 'individual' as const,
+      to: e164,
+      type: 'text' as const,
+      text: { body },
+    };
+    await sendMessage(phoneNumberId, biz.wa_access_token_enc!, encryptPhone(e164), msg);
+  };
+
+  // Check for existing customer
+  const { data: existing } = await supabase
+    .from('customers')
+    .select('id, opted_out_at, wallet_token, display_name')
+    .eq('business_id', business.id)
+    .eq('phone_hash', phoneHash)
+    .maybeSingle();
+
+  if (existing && !existing.opted_out_at) {
+    // Already registered — remind them of their status
+    const name = (existing.display_name as string | null) ?? contactName ?? 'du';
+    await sendText(
+      templates['already_registered']
+        ?? `Hej ${name}! Du bist bereits Mitglied. 😊\nSchreibe *Stempel* nach deinem nächsten Besuch.`,
+    );
+    return;
+  }
+
+  const displayName = contactName ?? 'Gast';
+  let customerId: string;
+  let walletToken: string | null = null;
+
+  if (existing?.opted_out_at) {
+    // Re-opt-in
+    await supabase
+      .from('customers')
+      .update({
+        phone_enc: phoneEnc,
+        display_name: displayName,
+        wa_contact_name: contactName,
+        opted_out_at: null,
+        opted_in_at: new Date().toISOString(),
+        opt_in_ip: null,
+        ...(referralCode ? { referred_by_code: referralCode } : {}),
+      })
+      .eq('id', existing.id);
+    customerId  = existing.id;
+    walletToken = existing.wallet_token as string | null;
+  } else {
+    // New customer — generate customer_code
+    const customerCode = await generateUniqueCustomerCode(business.id);
+
+    const { data: newCust } = await supabase
+      .from('customers')
+      .insert({
+        business_id: business.id,
+        phone_enc: phoneEnc,
+        phone_hash: phoneHash,
+        display_name: displayName,
+        wa_contact_name: contactName,
+        opted_in_at: new Date().toISOString(),
+        customer_code: customerCode,
+        ...(referralCode ? { referred_by_code: referralCode } : {}),
+      })
+      .select('id, wallet_token')
+      .single();
+
+    if (!newCust) {
+      logger.error({ businessId: business.id }, 'Failed to insert new customer');
+      return;
+    }
+    customerId  = newCust.id as string;
+    walletToken = newCust.wallet_token as string | null;
+  }
+
+  // Build wallet URL for the welcome message CTA
+  const walletUrl = walletToken && biz.slug && env.CLIENT_URL
+    ? `${env.CLIENT_URL}/r/${biz.slug}/wallet/${walletToken}`
+    : undefined;
+
+  const welcomeMsg = optInWelcomeText(
+    e164,
+    displayName,
+    biz.business_name,
+    walletUrl,
+    templates['opt_in_welcome'] ?? undefined,
+    templates['opt_in_welcome_cta'] ?? undefined,
+  );
+
+  const { to: _to, ...welcomeBody } = { ...welcomeMsg, to: e164 };
+  const waMessageId = await sendMessage(phoneNumberId, biz.wa_access_token_enc, phoneEnc, welcomeBody);
+
+  await supabase.from('notification_logs').insert({
+    business_id: business.id,
+    customer_id: customerId,
+    event_type: 'opt_in',
+    status: 'sent',
+    ...(waMessageId !== null ? { wa_message_id: waMessageId } : {}),
+  });
+
+  logger.info({ businessId: business.id, customerId }, 'Customer registered via WhatsApp keyword');
+}
+
+// ── Unique customer code generator (same logic as public.controller.ts) ───────
+
+async function generateUniqueCustomerCode(_businessId: string): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const digits = attempt < 15 ? 4 : 6;
+    const min    = Math.pow(10, digits - 1);
+    const max    = Math.pow(10, digits) - 1;
+    const code   = String(Math.floor(min + Math.random() * (max - min + 1)));
+    const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('customer_code', code)
+      .maybeSingle();
+    if (!data) return code;
+  }
+  return String(Date.now()).slice(-8);
+}
+
 // ── Stempel-Anfrage (Approval Flow) ─────────────────────────────────────────
-// Keyword "Stempel"/"Stamp" creates a pending stamp_request instead of
-// auto-issuing. The operator approves/declines via the dashboard modal.
 
 interface KeywordBusiness {
   id: string;
@@ -120,7 +292,6 @@ async function handleKeywordStamp(
   const e164      = `+${fromPhone}`;
   const phoneHash = hashPhone(e164);
 
-  // Find customer by phone hash
   const { data: customer } = await supabase
     .from('customers')
     .select('id, phone_enc, total_stamps')
@@ -131,7 +302,7 @@ async function handleKeywordStamp(
 
   const { data: biz } = await supabase
     .from('businesses')
-    .select('wa_access_token_enc, slug, message_templates')
+    .select('wa_access_token_enc, slug, message_templates, wa_phone_number')
     .eq('id', business.id)
     .single();
 
@@ -139,12 +310,15 @@ async function handleKeywordStamp(
 
   const templates = (biz.message_templates as Record<string, string> | null) ?? {};
 
-  // Unknown customer → registration prompt
+  // Unknown customer → prompt to register
   if (!customer) {
-    const tmpEnc = encryptPhone(e164);
-    const regUrl = biz.slug ? `${process.env['CLIENT_URL'] ?? ''}/r/${biz.slug}` : null;
+    const waNumber = (biz.wa_phone_number as string | null) ?? null;
+    const regUrl   = biz.slug
+      ? `${env.CLIENT_URL ?? ''}/r/${biz.slug}`
+      : null;
+
     const bodyText = templates['not_registered']
-      ?? 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉';
+      ?? 'Du bist noch nicht registriert. Melde dich über den Link an! 🎉';
 
     const body = regUrl
       ? {
@@ -167,11 +341,13 @@ async function handleKeywordStamp(
           text: { body: bodyText },
         };
 
+    const tmpEnc = encryptPhone(e164);
+    void waNumber; // wa_phone_number not needed for sending
     await sendMessage(phoneNumberId, biz.wa_access_token_enc, tmpEnc, body);
     return;
   }
 
-  // Create pending stamp_request (service handles cooldown + dedup)
+  // Create pending stamp_request
   const result = await createStampRequest(business.id, customer.id);
 
   const sendText = async (body: string): Promise<void> => {
@@ -182,7 +358,7 @@ async function handleKeywordStamp(
       type: 'text' as const,
       text: { body },
     };
-    await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msg);
+    await sendMessage(phoneNumberId, biz.wa_access_token_enc!, customer.phone_enc, msg);
   };
 
   if (result.status === 'duplicate') {
@@ -190,13 +366,11 @@ async function handleKeywordStamp(
     return;
   }
 
-  // status === 'created' → notify customer that request is pending
-  const stampCount = business.stamp_count ?? business.stamps_per_reward;
+  const stampCount  = business.stamp_count ?? business.stamps_per_reward;
   const pendingText = templates['stamp_request_pending']
     ?? `Deine Stempel-Anfrage wurde empfangen! ✅\n\n📍 Aktuell: ${customer.total_stamps}/${stampCount} Stempel\n\nDer Betreiber bestätigt sie gleich.`;
 
   await sendText(pendingText);
-
   logger.info({ businessId: business.id, customerId: customer.id }, 'Stamp request created');
 }
 

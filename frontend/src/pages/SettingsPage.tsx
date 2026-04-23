@@ -211,7 +211,7 @@ function WhatsAppTab() {
   const [connecting, setConnecting] = useState(false);
 
   const save = useMutation({
-    mutationFn: (payload: { waPhoneNumberId: string; waAccessToken: string }) =>
+    mutationFn: (payload: { waPhoneNumberId: string; waAccessToken: string; waPhoneNumber?: string }) =>
       api.patch('/businesses/me/whatsapp', payload),
     onSuccess: () => toast.success('WhatsApp erfolgreich verbunden!'),
     onError: (e) => toast.error(e.message),
@@ -263,6 +263,7 @@ function WhatsAppTab() {
         toast.success(`Verbunden! Phone ID: ${result.phone_number_id}`);
 
         // Persist phone_number_id — token must be set via System User in Meta Business Manager
+        // wa_phone_number must be entered manually in the settings field below
         save.mutate({ waPhoneNumberId: result.phone_number_id, waAccessToken: '' });
       } catch { /* ignore non-JSON messages */ }
     }
@@ -320,10 +321,18 @@ function WhatsAppTab() {
         </div>
 
         {isConnected && (
-          <div className="rounded-lg bg-muted/60 border p-3 space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Verbundene Phone Number ID</p>
-            <p className="text-sm font-mono">{business.wa_phone_number_id}</p>
-            <div className="flex items-center gap-1.5 mt-1">
+          <div className="rounded-lg bg-muted/60 border p-3 space-y-2">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Phone Number ID (Meta)</p>
+              <p className="text-sm font-mono">{business.wa_phone_number_id}</p>
+            </div>
+            {business.wa_phone_number && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">WhatsApp-Nummer</p>
+                <p className="text-sm font-mono">+{business.wa_phone_number}</p>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
               <span className="text-xs text-green-700">Aktiv</span>
             </div>
@@ -364,11 +373,16 @@ function WhatsAppTab() {
 
 function ManualWhatsAppForm() {
   const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [accessToken, setAccessToken] = useState('');
+  const [phoneNumber, setPhoneNumber]     = useState('');
+  const [accessToken, setAccessToken]     = useState('');
 
   const save = useMutation({
     mutationFn: () =>
-      api.patch('/businesses/me/whatsapp', { waPhoneNumberId: phoneNumberId, waAccessToken: accessToken }),
+      api.patch('/businesses/me/whatsapp', {
+        waPhoneNumberId: phoneNumberId,
+        waAccessToken: accessToken,
+        ...(phoneNumber ? { waPhoneNumber: phoneNumber } : {}),
+      }),
     onSuccess: () => toast.success('WhatsApp-Einstellungen gespeichert'),
     onError: (e) => toast.error(e.message),
   });
@@ -383,13 +397,23 @@ function ManualWhatsAppForm() {
         </p>
       </div>
       <div>
-        <label className="text-sm font-medium">Phone Number ID</label>
+        <label className="text-sm font-medium">Phone Number ID <span className="text-muted-foreground font-normal">(Meta intern)</span></label>
         <input
           value={phoneNumberId}
           onChange={(e) => setPhoneNumberId(e.target.value)}
-          placeholder="1234567890"
+          placeholder="1234567890123456"
           className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
+      </div>
+      <div>
+        <label className="text-sm font-medium">WhatsApp-Nummer <span className="text-muted-foreground font-normal">(für QR-Code)</span></label>
+        <input
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+          placeholder="4915123456789"
+          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Nur Ziffern, ohne +. Wird in wa.me-Links verwendet.</p>
       </div>
       <div>
         <label className="text-sm font-medium">Access Token</label>

@@ -12,7 +12,7 @@ import { RewardsPage } from '@/pages/RewardsPage';
 import { BlastsPage } from '@/pages/BlastsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
-import { PublicRegistrationPage } from '@/pages/PublicRegistrationPage';
+import { QrRedirectPage } from '@/pages/QrRedirectPage';
 import { CustomerWalletPage } from '@/pages/CustomerWalletPage';
 
 // Architecture kept for future use — not rendered in nav
@@ -23,7 +23,7 @@ export default function App() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/r/:slug" element={<PublicRegistrationPage />} />
+      <Route path="/r/:slug" element={<QrRedirectPage />} />
       <Route path="/r/:slug/wallet/:token" element={<CustomerWalletPage />} />
 
       {/* App shell */}

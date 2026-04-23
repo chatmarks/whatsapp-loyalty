@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -366,6 +366,13 @@ export function CustomerWalletPage() {
         .then((r) => r.json()) as Promise<{ data: WalletData }>,
     enabled: !!slug && !!token,
   });
+
+  // Persist wallet token in localStorage so QR redirect knows this customer
+  useEffect(() => {
+    if (slug && token && raw?.data) {
+      localStorage.setItem(`wl_${slug}`, token);
+    }
+  }, [slug, token, raw]);
 
   const data = raw?.data;
 

@@ -1,27 +1,14 @@
 import type { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { supabase } from '../../config/supabase.js';
-import { encryptPhone, hashPhone } from '../../lib/crypto.js';
-import { NotFoundError, ConflictError } from '../../lib/errors.js';
+import { NotFoundError } from '../../lib/errors.js';
 import { createOrder } from '../orders/orders.service.js';
 import { CreateOrderSchema } from '../orders/orders.schema.js';
 import { logger } from '../../lib/logger.js';
 
-const OptInSchema = z.object({
-  displayName: z.string().min(1).max(100),
-  // E.164 format: +49... — validated but never logged
-  phone: z.string().regex(/^\+[1-9]\d{6,14}$/),
-  consentGiven: z.literal(true, {
-    errorMap: () => ({ message: 'DSGVO consent required' }),
-  }),
-  // Optional: customer_code of the person who referred this registration
-  referralCode: z.string().max(20).optional(),
-});
-
 async function findBusinessBySlug(slug: string) {
   const { data } = await supabase
     .from('businesses')
-    .select('id, business_name, logo_url, primary_color, wa_phone_number_id, stamps_per_reward, reward_description, stamp_count, reward_stages')
+    .select('id, business_name, logo_url, primary_color, wa_phone_number_id, wa_phone_number, stamps_per_reward, reward_description, stamp_count, reward_stages')
     .eq('slug', slug)
     .eq('active', true)
     .maybeSingle();
@@ -38,6 +25,7 @@ export async function getRegistrationHandler(
     if (!business) throw new NotFoundError('Business');
 
     // Return only public-safe branding info — no secrets
+    // waPhoneNumber is the actual number for wa.me links (NOT the Meta phone_number_id)
     res.json({
       data: {
         businessName: business.business_name,
@@ -47,96 +35,8 @@ export async function getRegistrationHandler(
         rewardDescription: business.reward_description,
         stampCount: business.stamp_count ?? business.stamps_per_reward,
         rewardStages: business.reward_stages ?? [{ stamp: business.stamps_per_reward, description: business.reward_description }],
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
-/** Generate a random numeric code (4+ digits) unique across all customers. */
-async function generateUniqueCustomerCode(): Promise<string> {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    // 4 digits for first attempts; expand to 6 after many collisions
-    const digits = attempt < 15 ? 4 : 6;
-    const min = Math.pow(10, digits - 1);
-    const max = Math.pow(10, digits) - 1;
-    const code = String(Math.floor(min + Math.random() * (max - min + 1)));
-    const { data } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('customer_code', code)
-      .maybeSingle();
-    if (!data) return code;
-  }
-  // Fallback: 8-digit timestamp-based code
-  return String(Date.now()).slice(-8);
-}
-
-export async function submitRegistrationHandler(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const input = OptInSchema.parse(req.body);
-    const business = await findBusinessBySlug(req.params['slug'] as string);
-    if (!business) throw new NotFoundError('Business');
-
-    const phoneHash = hashPhone(input.phone);
-
-    // Check if already opted in
-    const { data: existing } = await supabase
-      .from('customers')
-      .select('id, opted_out_at')
-      .eq('business_id', business.id)
-      .eq('phone_hash', phoneHash)
-      .maybeSingle();
-
-    if (existing && !existing.opted_out_at) {
-      throw new ConflictError('Already registered for this loyalty program');
-    }
-
-    const phoneEnc = encryptPhone(input.phone);
-    const optInIp = req.ip ?? null;
-
-    if (existing?.opted_out_at) {
-      // Re-opt-in: clear opt-out flag, update name
-      await supabase
-        .from('customers')
-        .update({
-          phone_enc: phoneEnc,
-          display_name: input.displayName,
-          opted_out_at: null,
-          opted_in_at: new Date().toISOString(),
-          opt_in_ip: optInIp,
-        })
-        .eq('id', existing.id);
-    } else {
-      const customerCode = await generateUniqueCustomerCode();
-      await supabase.from('customers').insert({
-        business_id: business.id,
-        phone_enc: phoneEnc,
-        phone_hash: phoneHash,
-        display_name: input.displayName,
-        opted_in_at: new Date().toISOString(),
-        opt_in_ip: optInIp,
-        customer_code: customerCode,
-        // Store referrer's customer_code if provided — triggers bonus after first stamp
-        ...(input.referralCode ? { referred_by_code: input.referralCode } : {}),
-      });
-    }
-
-    // Phone discarded after insert — never appears in response or logs
-    logger.info({ businessId: business.id }, 'Customer opted in');
-
-    res.status(201).json({
-      data: {
-        message: 'Registration successful',
-        // WhatsApp deep-link for the customer to initiate conversation
-        whatsappLink: business.wa_phone_number_id
-          ? `https://wa.me/${business.wa_phone_number_id}?text=Hallo`
-          : null,
+        // Actual WA number for deep links — may be null if not configured yet
+        waPhoneNumber: (business.wa_phone_number as string | null) ?? null,
       },
     });
   } catch (err) {

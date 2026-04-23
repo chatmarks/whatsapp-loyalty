@@ -8,7 +8,7 @@ import type { UpdateBusinessInput, UpdateWhatsAppInput } from './businesses.sche
 // Columns safe to return to the client (excludes secrets)
 const SAFE_COLUMNS = [
   'id', 'owner_email', 'business_name', 'slug', 'phone_display',
-  'wa_phone_number_id', 'stripe_subscription_id', 'plan',
+  'wa_phone_number_id', 'wa_phone_number', 'stripe_subscription_id', 'plan',
   'stamps_per_reward', 'reward_description', 'stamp_count', 'reward_stages',
   'blast_count_this_week',
   'logo_url', 'banner_url', 'primary_color', 'secondary_color',
@@ -69,6 +69,7 @@ export async function updateWhatsApp(
     .update({
       wa_phone_number_id: input.waPhoneNumberId,
       wa_access_token_enc: tokenEnc,
+      ...(input.waPhoneNumber ? { wa_phone_number: input.waPhoneNumber } : {}),
     })
     .eq('id', businessId);
 

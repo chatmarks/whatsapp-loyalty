@@ -12,6 +12,7 @@ export interface Business {
   slug: string;
   phone_display: string | null;
   wa_phone_number_id: string | null;
+  wa_phone_number: string | null;
   plan: Plan;
   stamps_per_reward: number;
   reward_description: string;

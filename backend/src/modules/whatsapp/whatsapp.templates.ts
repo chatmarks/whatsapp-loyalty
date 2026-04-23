@@ -85,6 +85,43 @@ export function rewardEarnedText(
   return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };
 }
 
+/**
+ * Welcome message sent after auto-registration via the WhatsApp keyword flow.
+ * Includes a CTA button that opens the customer's wallet.
+ */
+export function optInWelcomeText(
+  to: string,
+  customerName: string,
+  businessName: string,
+  walletUrl: string | undefined,
+  customBody?: string,
+  ctaLabel?: string,
+): OutboundMessage {
+  const body = customBody
+    ?.replace('{name}', customerName)
+    ?.replace('{businessName}', businessName)
+    ?? `Willkommen bei ${businessName}, ${customerName}! 🎉\n\nDu bist jetzt Teil unseres Treueprogramms.\nSchreibe *Stempel* nach jedem Besuch, um Stempel zu sammeln.`;
+
+  if (walletUrl) {
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: body },
+        action: {
+          name: 'cta_url',
+          parameters: { display_text: ctaLabel ?? 'Stempelkarte öffnen', url: walletUrl },
+        },
+      },
+    };
+  }
+
+  return { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body } };
+}
+
 export function optOutConfirmText(to: string, customBody?: string): TextMessageRequest {
   return {
     messaging_product: 'whatsapp',
