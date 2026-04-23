@@ -62,6 +62,13 @@ export async function triggerReferralBonus(
     issued_by: businessId,
   });
 
+  await supabase.from('notification_logs').insert({
+    business_id: businessId,
+    customer_id: customerId,
+    event_type: 'referral',
+    status: 'sent',
+  });
+
   // ── +1 referral stamp to the referrer ────────────────────────────────────
 
   const { data: referrer } = await supabase
@@ -95,6 +102,13 @@ export async function triggerReferralBonus(
     amount: 1,
     source: 'referral',
     issued_by: businessId,
+  });
+
+  await supabase.from('notification_logs').insert({
+    business_id: businessId,
+    customer_id: referrer.id,
+    event_type: 'referral',
+    status: 'sent',
   });
 
   logger.info(

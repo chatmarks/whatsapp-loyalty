@@ -46,7 +46,10 @@ export function QrRedirectPage() {
   });
 
   useEffect(() => {
-    if (!data?.waPhoneNumber) return;
+    // Still loading — wait for query to settle
+    if (data === undefined) return;
+    // Business found but WhatsApp not configured yet — show error state below
+    if (!data.waPhoneNumber) return;
 
     const knownToken = slug ? localStorage.getItem(WALLET_TOKEN_KEY(slug)) : null;
     const isKnown    = !!knownToken;
@@ -77,6 +80,19 @@ export function QrRedirectPage() {
         <p style={{ fontWeight: 700, fontSize: 18, margin: '8px 0 4px' }}>Link ungültig</p>
         <p style={{ color: '#888', fontSize: 14, margin: 0 }}>
           Bitte frage beim Betreiber nach einem neuen QR-Code.
+        </p>
+      </div>
+    );
+  }
+
+  // Data loaded but business hasn't configured their WhatsApp number yet
+  if (data && !data.waPhoneNumber) {
+    return (
+      <div style={styles.center}>
+        <span style={{ fontSize: 40 }}>⚙️</span>
+        <p style={{ fontWeight: 700, fontSize: 18, margin: '8px 0 4px' }}>WhatsApp noch nicht eingerichtet</p>
+        <p style={{ color: '#888', fontSize: 14, margin: 0, maxWidth: 280 }}>
+          Der Betreiber muss zuerst seine WhatsApp-Nummer in den Einstellungen hinterlegen.
         </p>
       </div>
     );

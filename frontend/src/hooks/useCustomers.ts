@@ -38,3 +38,21 @@ export function useDeleteCustomer() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
   });
 }
+
+export interface ReferredCustomer {
+  id: string;
+  display_name: string | null;
+  opted_in_at: string | null;
+  total_stamps: number;
+  lifetime_stamps: number;
+}
+
+export function useCustomerReferrals(customerId: string) {
+  return useQuery({
+    queryKey: ['customer-referrals', customerId],
+    queryFn: () =>
+      api.get<{ data: ReferredCustomer[] }>(`/customers/${customerId}/referrals`)
+        .then((r) => r.data),
+    enabled: !!customerId,
+  });
+}

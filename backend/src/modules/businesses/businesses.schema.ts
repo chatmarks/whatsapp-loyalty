@@ -30,8 +30,7 @@ export const UpdateBusinessSchema = z.object({
 export const UpdateWhatsAppSchema = z.object({
   waPhoneNumberId: z.string().min(1),
   waAccessToken: z.string().min(1),
-  // Actual phone number (no +) used for wa.me deep links, e.g. "4915123456789"
-  waPhoneNumber: z.string().regex(/^\d{7,15}$/, 'Nur Ziffern, ohne +').optional(),
+  // wa_phone_number is resolved automatically via Graph API — not accepted from client
 });
 
 export type UpdateBusinessInput = z.infer<typeof UpdateBusinessSchema>;

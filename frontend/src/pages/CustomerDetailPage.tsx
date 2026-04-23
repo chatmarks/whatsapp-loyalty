@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, MessageSquare } from 'lucide-react';
-import { useCustomer } from '@/hooks/useCustomers';
+import { ExternalLink, MessageSquare, UserPlus } from 'lucide-react';
+import { useCustomer, useCustomerReferrals } from '@/hooks/useCustomers';
 import { useBusiness } from '@/hooks/useBusiness';
 import { formatDate, formatDateTime } from '@/lib/utils';
 
@@ -8,6 +8,7 @@ export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: customer, isLoading } = useCustomer(id ?? '');
   const { data: business } = useBusiness();
+  const { data: referrals } = useCustomerReferrals(id ?? '');
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Wird geladen…</div>;
   if (!customer) return <div className="p-6 text-destructive">Kunde nicht gefunden</div>;
@@ -83,6 +84,44 @@ export function CustomerDetailPage() {
           )}
         </div>
       </div>
+      {/* Referrals */}
+      {referrals !== undefined && (
+        <div className="rounded-xl border bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-violet-500" />
+            <h2 className="font-semibold text-sm">Eingeladen</h2>
+            {referrals.length > 0 && (
+              <span className="ml-auto rounded-full bg-violet-100 text-violet-700 text-xs font-semibold px-2 py-0.5">
+                {referrals.length}
+              </span>
+            )}
+          </div>
+          {referrals.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Noch niemanden eingeladen.</p>
+          ) : (
+            <div className="divide-y">
+              {referrals.map((r) => (
+                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <div>
+                    <Link
+                      to={`/customers/${r.id}`}
+                      className="font-medium hover:underline text-foreground"
+                    >
+                      {r.display_name ?? 'Gast'}
+                    </Link>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Beigetreten {r.opted_in_at ? formatDate(r.opted_in_at) : '—'}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {r.lifetime_stamps} Stempel
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

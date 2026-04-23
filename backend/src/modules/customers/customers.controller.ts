@@ -52,6 +52,16 @@ export async function listActivityHandler(req: Request, res: Response, next: Nex
   }
 }
 
+export async function listReferralsHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const customerId = req.params['id'] as string;
+    const data = await CustomerService.getReferrals(req.business.id, customerId);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 const SendMessageSchema = z.object({ body: z.string().min(1).max(4096) });
 
 export async function sendMessageHandler(req: Request, res: Response, next: NextFunction): Promise<void> {

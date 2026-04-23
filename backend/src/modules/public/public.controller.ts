@@ -63,13 +63,30 @@ export async function getWalletHandler(
 
     if (!customer) throw new NotFoundError('Wallet');
 
-    const { data: vouchers } = await supabase
-      .from('vouchers')
-      .select('code, description, issued_at, expires_at')
-      .eq('customer_id', customer.id)
-      .is('redeemed_at', null)
-      .is('claimed_at', null)
-      .order('issued_at', { ascending: false });
+    const [{ data: vouchers }, { data: recentStamps }] = await Promise.all([
+      supabase
+        .from('vouchers')
+        .select('code, description, issued_at, expires_at')
+        .eq('customer_id', customer.id)
+        .is('redeemed_at', null)
+        .is('claimed_at', null)
+        .order('issued_at', { ascending: false }),
+      // Fetch sources for the stamps currently on the card (newest first, then reverse)
+      customer.total_stamps > 0
+        ? supabase
+            .from('stamp_events')
+            .select('source')
+            .eq('business_id', business.id)
+            .eq('customer_id', customer.id)
+            .order('created_at', { ascending: false })
+            .limit(customer.total_stamps as number)
+        : { data: [] },
+    ]);
+
+    // Reverse so index 0 = first dot (oldest stamp on current card)
+    const stampSources = ((recentStamps ?? []) as { source: string }[])
+      .map((r) => r.source)
+      .reverse();
 
     res.json({
       data: {
@@ -88,6 +105,8 @@ export async function getWalletHandler(
           lifetimeStamps: customer.lifetime_stamps,
           // customer_code doubles as the shareable referral code
           referralCode: customer.customer_code ?? null,
+          // Source per filled dot on the current card ('stamp' | 'referral' | ...)
+          stampSources,
         },
         vouchers: vouchers ?? [],
       },

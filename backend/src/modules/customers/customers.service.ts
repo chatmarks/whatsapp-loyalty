@@ -184,6 +184,39 @@ export async function listActivity(
   return (data ?? []) as ActivityEvent[];
 }
 
+export interface ReferredCustomer {
+  id: string;
+  display_name: string | null;
+  opted_in_at: string | null;
+  total_stamps: number;
+  lifetime_stamps: number;
+}
+
+/** Returns all customers who registered using this customer's referral code. */
+export async function getReferrals(
+  businessId: string,
+  customerId: string,
+): Promise<ReferredCustomer[]> {
+  // First resolve the customer's own code
+  const { data: self } = await supabase
+    .from('customers')
+    .select('customer_code')
+    .eq('id', customerId)
+    .eq('business_id', businessId)
+    .maybeSingle();
+
+  if (!self?.customer_code) return [];
+
+  const { data } = await supabase
+    .from('customers')
+    .select('id, display_name, opted_in_at, total_stamps, lifetime_stamps')
+    .eq('business_id', businessId)
+    .eq('referred_by_code', self.customer_code)
+    .order('opted_in_at', { ascending: false });
+
+  return (data ?? []) as ReferredCustomer[];
+}
+
 /**
  * DSGVO deletion: anonymise PII in-place, retain business analytics.
  * Hard-delete scheduled after 30-day retention by a cron job.

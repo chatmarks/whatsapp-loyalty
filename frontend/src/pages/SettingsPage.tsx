@@ -211,7 +211,7 @@ function WhatsAppTab() {
   const [connecting, setConnecting] = useState(false);
 
   const save = useMutation({
-    mutationFn: (payload: { waPhoneNumberId: string; waAccessToken: string; waPhoneNumber?: string }) =>
+    mutationFn: (payload: { waPhoneNumberId: string; waAccessToken: string }) =>
       api.patch('/businesses/me/whatsapp', payload),
     onSuccess: () => toast.success('WhatsApp erfolgreich verbunden!'),
     onError: (e) => toast.error(e.message),
@@ -340,8 +340,8 @@ function WhatsAppTab() {
         )}
       </div>
 
-      {/* Embedded signup button — only if Meta App ID is configured */}
-      {META_APP_ID ? (
+      {/* Embedded signup — requires VITE_META_APP_ID to be set */}
+      {META_APP_ID && (
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h3 className="text-sm font-semibold">
             {isConnected ? 'Konto wechseln' : 'Mit WhatsApp verbinden'}
@@ -356,85 +356,17 @@ function WhatsAppTab() {
             className="flex items-center gap-2.5 rounded-md px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 transition-colors"
             style={{ backgroundColor: '#1877F2' }}
           >
-            {/* Meta's official Facebook logo mark */}
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white" aria-hidden="true">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
             {connecting ? 'Verbinde…' : isConnected ? 'Konto neu verknüpfen' : 'Mit Facebook anmelden'}
           </button>
         </div>
-      ) : (
-        /* Fallback: manual config when no Meta App ID is set (dev/self-hosted) */
-        <ManualWhatsAppForm />
       )}
     </div>
   );
 }
 
-function ManualWhatsAppForm() {
-  const [phoneNumberId, setPhoneNumberId] = useState('');
-  const [phoneNumber, setPhoneNumber]     = useState('');
-  const [accessToken, setAccessToken]     = useState('');
-
-  const save = useMutation({
-    mutationFn: () =>
-      api.patch('/businesses/me/whatsapp', {
-        waPhoneNumberId: phoneNumberId,
-        waAccessToken: accessToken,
-        ...(phoneNumber ? { waPhoneNumber: phoneNumber } : {}),
-      }),
-    onSuccess: () => toast.success('WhatsApp-Einstellungen gespeichert'),
-    onError: (e) => toast.error(e.message),
-  });
-
-  return (
-    <div className="rounded-xl border bg-card p-5 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">Manuelle Konfiguration</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Nutze einen permanenten System-User-Token aus dem Meta Business Manager.
-          Token wird verschlüsselt gespeichert und nie im Klartext zurückgegeben.
-        </p>
-      </div>
-      <div>
-        <label className="text-sm font-medium">Phone Number ID <span className="text-muted-foreground font-normal">(Meta intern)</span></label>
-        <input
-          value={phoneNumberId}
-          onChange={(e) => setPhoneNumberId(e.target.value)}
-          placeholder="1234567890123456"
-          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      </div>
-      <div>
-        <label className="text-sm font-medium">WhatsApp-Nummer <span className="text-muted-foreground font-normal">(für QR-Code)</span></label>
-        <input
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-          placeholder="4915123456789"
-          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">Nur Ziffern, ohne +. Wird in wa.me-Links verwendet.</p>
-      </div>
-      <div>
-        <label className="text-sm font-medium">Access Token</label>
-        <input
-          type="password"
-          value={accessToken}
-          onChange={(e) => setAccessToken(e.target.value)}
-          placeholder="EAAxxxxx…"
-          className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      </div>
-      <button
-        onClick={() => save.mutate()}
-        disabled={save.isPending || !phoneNumberId || !accessToken}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {save.isPending ? 'Wird gespeichert…' : 'Speichern'}
-      </button>
-    </div>
-  );
-}
 
 // ── Nachrichten ───────────────────────────────────────────────────────────────
 

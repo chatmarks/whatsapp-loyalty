@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Send, Stamp, Gift, LogIn, LogOut } from 'lucide-react';
+import { ArrowLeft, Send, Stamp, Gift, LogIn, LogOut, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomer } from '@/hooks/useCustomers';
 import { useMessages, useSendMessage } from '@/hooks/useMessages';
@@ -27,11 +27,12 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 const EVENT_META: Record<string, { label: string; Icon: React.ElementType; color: string }> = {
-  stamp_issued:   { label: 'Stempel vergeben',   Icon: Stamp,  color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  voucher_issued: { label: 'Belohnung erhalten',  Icon: Gift,   color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  opt_in:         { label: 'Opt-in',              Icon: LogIn,  color: 'text-green-600 bg-green-50 border-green-200' },
-  opt_out:        { label: 'Opt-out',             Icon: LogOut, color: 'text-red-600 bg-red-50 border-red-200' },
-  blast:          { label: 'Broadcast gesendet',  Icon: Send,   color: 'text-violet-600 bg-violet-50 border-violet-200' },
+  stamp_issued:   { label: 'Stempel vergeben',     Icon: Stamp,    color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  voucher_issued: { label: 'Belohnung erhalten',   Icon: Gift,     color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  opt_in:         { label: 'Opt-in',               Icon: LogIn,    color: 'text-green-600 bg-green-50 border-green-200' },
+  opt_out:        { label: 'Opt-out',              Icon: LogOut,   color: 'text-red-600 bg-red-50 border-red-200' },
+  blast:          { label: 'Broadcast gesendet',   Icon: Send,     color: 'text-violet-600 bg-violet-50 border-violet-200' },
+  referral:       { label: 'Referral-Bonus +1 🤝', Icon: UserPlus, color: 'text-violet-700 bg-violet-50 border-violet-300' },
 };
 
 type ChatItem =

@@ -21,6 +21,7 @@ interface WalletData {
     totalStamps: number;
     lifetimeStamps: number;
     referralCode: string | null;
+    stampSources: string[]; // per filled dot: 'stamp' | 'referral' | ...
   };
   vouchers: Array<{
     code: string;
@@ -32,30 +33,55 @@ interface WalletData {
 
 // ── Stamp dot ─────────────────────────────────────────────────────────────────
 
+// Referral stamp: violet fill, handshake icon
+const REFERRAL_COLOR = '#7c3aed';
+
 function StampDot({
-  filled, isNew, isReward, index, color, emoji,
+  filled, isNew, isReward, isReferral, index, color, emoji,
 }: {
-  filled: boolean; isNew: boolean; isReward: boolean;
+  filled: boolean; isNew: boolean; isReward: boolean; isReferral: boolean;
   index: number; color: string; emoji?: string;
 }) {
+  const fillColor = filled
+    ? isReward ? '#f59e0b' : isReferral ? REFERRAL_COLOR : color
+    : 'transparent';
+
+  const borderStyle = filled ? 'none'
+    : isReward ? `2.5px dashed #f59e0b88`
+    : isReferral ? `2.5px dashed ${REFERRAL_COLOR}66`
+    : `2.5px solid ${color}40`;
+
+  const shadow = filled
+    ? isReward ? '0 4px 12px rgba(245,158,11,0.45)'
+    : isReferral ? `0 4px 12px ${REFERRAL_COLOR}55`
+    : `0 4px 12px ${color}55`
+    : 'none';
+
   return (
     <div
       style={{
         width: 52, height: 52, borderRadius: '50%',
-        background: filled ? (isReward ? '#f59e0b' : color) : 'transparent',
-        border: filled ? 'none' : isReward ? `2.5px dashed #f59e0b88` : `2.5px solid ${color}40`,
+        background: fillColor,
+        border: borderStyle,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         transition: 'all 0.3s ease',
         animation: isNew
           ? 'stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
           : filled ? `fadeStamp 0.4s ease ${index * 60}ms both` : undefined,
-        opacity: filled ? 1 : isReward ? 0.55 : 0.35,
-        boxShadow: filled ? (isReward ? '0 4px 12px rgba(245,158,11,0.45)' : `0 4px 12px ${color}55`) : 'none',
+        opacity: filled ? 1 : isReward ? 0.55 : isReferral ? 0.5 : 0.35,
+        boxShadow: shadow,
         fontSize: 20,
       }}
     >
       {filled ? (
-        isReward ? (emoji ?? '🎁') : (
+        isReward ? (emoji ?? '🎁') :
+        isReferral ? (
+          // Handshake icon (two hands meeting)
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M9 11l2 2 4-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M20 7h-3.5l-2-2H13l-2 2H7a2 2 0 00-2 2v6a2 2 0 002 2h1l1 2h6l1-2h1a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -481,6 +507,8 @@ export function CustomerWalletPage() {
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(5, totalSlots)}, 1fr)`, gap: 8, justifyItems: 'center' }}>
               {Array.from({ length: totalSlots }, (_, i) => i + 1).map((pos) => {
                 const stageForPos = rewardStages.find((s) => s.stamp === pos);
+                // stampSources is ordered oldest→newest; pos 1 = index 0
+                const source = customer.stampSources[pos - 1] ?? 'stamp';
                 return (
                   <StampDot
                     key={pos}
@@ -488,6 +516,7 @@ export function CustomerWalletPage() {
                     filled={pos <= filled}
                     isNew={isNew && pos === filled}
                     isReward={rewardPositions.has(pos)}
+                    isReferral={pos <= filled && source === 'referral'}
                     color={color}
                     {...(stageForPos?.emoji !== undefined ? { emoji: stageForPos.emoji } : {})}
                   />

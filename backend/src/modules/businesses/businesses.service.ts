@@ -1,9 +1,39 @@
 import { supabase } from '../../config/supabase.js';
 import { encryptPhone } from '../../lib/crypto.js';
 import { NotFoundError } from '../../lib/errors.js';
+import { logger } from '../../lib/logger.js';
 import type { BusinessStats } from '../../types/api.js';
 import type { Business } from '../../types/database.js';
 import type { UpdateBusinessInput, UpdateWhatsAppInput } from './businesses.schema.js';
+
+const GRAPH_API_VERSION = 'v22.0';
+
+/**
+ * Resolves the actual WhatsApp phone number from the Meta Graph API.
+ * Returns digits-only string (e.g. "4915123456789") suitable for wa.me links,
+ * or null if the call fails (non-fatal — credentials still saved).
+ */
+async function resolveWaPhoneNumber(
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}?fields=display_phone_number&access_token=${accessToken}`;
+    const res  = await fetch(url);
+    if (!res.ok) {
+      logger.warn({ phoneNumberId, status: res.status }, 'Graph API: failed to resolve phone number');
+      return null;
+    }
+    const json = await res.json() as { display_phone_number?: string };
+    if (!json.display_phone_number) return null;
+
+    // Strip all non-digit characters: "+49 151 23456789" → "4915123456789"
+    return json.display_phone_number.replace(/\D/g, '');
+  } catch (err) {
+    logger.warn({ err, phoneNumberId }, 'Graph API: exception resolving phone number');
+    return null;
+  }
+}
 
 // Columns safe to return to the client (excludes secrets)
 const SAFE_COLUMNS = [
@@ -64,12 +94,21 @@ export async function updateWhatsApp(
   // Encrypt the WA access token before storing
   const tokenEnc = encryptPhone(input.waAccessToken);
 
+  // Resolve the actual phone number from Meta — non-fatal if it fails
+  const waPhoneNumber = await resolveWaPhoneNumber(input.waPhoneNumberId, input.waAccessToken);
+  if (waPhoneNumber) {
+    logger.info({ businessId, waPhoneNumber }, 'Resolved wa_phone_number from Graph API');
+  } else {
+    logger.warn({ businessId }, 'Could not resolve wa_phone_number from Graph API — QR redirect will not work until manually set');
+  }
+
   const { error } = await supabase
     .from('businesses')
     .update({
       wa_phone_number_id: input.waPhoneNumberId,
       wa_access_token_enc: tokenEnc,
-      ...(input.waPhoneNumber ? { wa_phone_number: input.waPhoneNumber } : {}),
+      // Always write the resolved value (null clears a stale number if credentials changed)
+      wa_phone_number: waPhoneNumber,
     })
     .eq('id', businessId);
 
