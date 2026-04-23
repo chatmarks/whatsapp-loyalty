@@ -4,9 +4,6 @@ import { NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { issueStamps } from '../stamps/stamps.service.js';
 
-/** Cooldown window: one stamp request per customer per 4 hours. */
-const COOLDOWN_MS = 4 * 60 * 60 * 1000;
-
 export interface PendingRequest {
   id: string;
   created_at: string;
@@ -20,41 +17,17 @@ export interface PendingRequest {
   reward_stages: Array<{ stamp: number; description: string; emoji?: string }>;
 }
 
-export type CreateResult =
-  | { status: 'created' }
-  | { status: 'cooldown'; hoursLeft: number }
-  | { status: 'duplicate' };
+export type CreateResult = { status: 'created' } | { status: 'duplicate' };
 
 /**
  * Create a pending stamp request for a customer.
- * Enforces a 4-hour cooldown: if a request (pending OR approved) already exists
- * within the window, returns 'cooldown'.
- * If a pending request already exists, returns 'duplicate' (send waiting message).
+ * No cooldown — operators decide how many stamps to award.
+ * Only deduplicates: if a request is already pending for this customer, returns 'duplicate'.
  */
 export async function createStampRequest(
   businessId: string,
   customerId: string,
 ): Promise<CreateResult> {
-  const cooldownSince = new Date(Date.now() - COOLDOWN_MS).toISOString();
-
-  // Check for recent approved request (cooldown)
-  const { data: recentApproved } = await supabase
-    .from('stamp_requests')
-    .select('created_at')
-    .eq('business_id', businessId)
-    .eq('customer_id', customerId)
-    .eq('status', 'approved')
-    .gte('created_at', cooldownSince)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (recentApproved) {
-    const nextAvailable = new Date(new Date(recentApproved.created_at).getTime() + COOLDOWN_MS);
-    const hoursLeft = Math.max(1, Math.ceil((nextAvailable.getTime() - Date.now()) / (60 * 60 * 1000)));
-    return { status: 'cooldown', hoursLeft };
-  }
-
   // Check for existing pending request
   const { data: existingPending } = await supabase
     .from('stamp_requests')

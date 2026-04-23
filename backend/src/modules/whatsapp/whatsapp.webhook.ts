@@ -185,14 +185,6 @@ async function handleKeywordStamp(
     await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msg);
   };
 
-  if (result.status === 'cooldown') {
-    const cooldownText = (templates['stamp_cooldown']
-      ?? 'Du hast bereits einen Stempel angefragt. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) möglich.')
-      .replace('{hours}', String(result.hoursLeft));
-    await sendText(cooldownText);
-    return;
-  }
-
   if (result.status === 'duplicate') {
     await sendText('Deine Anfrage wird gerade bearbeitet. Bitte hab einen Moment Geduld. ⏳');
     return;
