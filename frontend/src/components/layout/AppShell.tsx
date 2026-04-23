@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { ChatSlideout } from './ChatSlideout';
+import { StampApprovalModal } from '@/components/stamps/StampApprovalModal';
 import { useHasUnread } from '@/hooks/useConversations';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,7 @@ export function AppShell() {
       </div>
 
       <ChatSlideout open={chatOpen} onClose={() => setChatOpen(false)} />
+      <StampApprovalModal />
     </div>
   );
 }

@@ -1,16 +1,13 @@
 import { supabase } from '../../config/supabase.js';
 import { hashPhone, encryptPhone } from '../../lib/crypto.js';
 import { logger } from '../../lib/logger.js';
-import { env } from '../../config/env.js';
 import { findBusinessByWaPhoneId, sendMessage } from './whatsapp.service.js';
-import { optOutConfirmText, stampIssuedText, rewardEarnedText } from './whatsapp.templates.js';
+import { optOutConfirmText } from './whatsapp.templates.js';
+import { createStampRequest } from '../stamp-requests/stamp-requests.service.js';
 import type { WebhookPayload, InboundMessage, MessageStatus } from '../../types/whatsapp.js';
 
 const OPT_OUT_KEYWORDS = new Set(['stop', 'abmelden', 'nein', 'stopp']);
 const STAMP_KEYWORDS   = new Set(['stempel', 'stamp']);
-
-// Mindestabstand zwischen zwei Keyword-Stempeln pro Kunde (Missbrauchsschutz)
-const STAMP_COOLDOWN_HOURS = 8;
 
 export async function handleWebhookPayload(payload: WebhookPayload): Promise<void> {
   for (const entry of payload.entry) {
@@ -102,7 +99,9 @@ async function handleInboundMessage(
   logger.info({ businessId: business.id }, 'Inbound text received (non-keyword)');
 }
 
-// ── Keyword-Stempel ──────────────────────────────────────────────────────────
+// ── Stempel-Anfrage (Approval Flow) ─────────────────────────────────────────
+// Keyword "Stempel"/"Stamp" creates a pending stamp_request instead of
+// auto-issuing. The operator approves/declines via the dashboard modal.
 
 interface KeywordBusiness {
   id: string;
@@ -118,175 +117,95 @@ async function handleKeywordStamp(
   business: KeywordBusiness,
   phoneNumberId: string,
 ): Promise<void> {
-  const e164       = `+${fromPhone}`;
-  const phoneHash  = hashPhone(e164);
+  const e164      = `+${fromPhone}`;
+  const phoneHash = hashPhone(e164);
 
-  // Kunden anhand des Phone-Hash suchen
+  // Find customer by phone hash
   const { data: customer } = await supabase
     .from('customers')
-    .select('id, phone_enc, total_stamps, lifetime_stamps, wallet_token')
+    .select('id, phone_enc, total_stamps')
     .eq('business_id', business.id)
     .eq('phone_hash', phoneHash)
     .is('opted_out_at', null)
     .maybeSingle();
 
-  if (!customer) {
-    // Unbekannte Nummer — freundlicher Hinweis mit CTA-Button zum Registrieren
-    const tmpEnc = encryptPhone(e164);
-    const { data: biz } = await supabase
-      .from('businesses')
-      .select('wa_access_token_enc, slug, message_templates')
-      .eq('id', business.id)
-      .single();
-
-    if (biz?.wa_access_token_enc) {
-      const regUrl = biz.slug
-        ? `${process.env['CLIENT_URL'] ?? ''}/r/${biz.slug}`
-        : null;
-      const customText = (biz.message_templates as Record<string, string> | null)?.['not_registered'];
-      const bodyText = customText
-        ?? 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉';
-
-      const body = regUrl
-        ? {
-            messaging_product: 'whatsapp' as const,
-            recipient_type: 'individual' as const,
-            type: 'interactive' as const,
-            interactive: {
-              type: 'cta_url' as const,
-              body: { text: bodyText },
-              action: { name: 'cta_url' as const, parameters: { display_text: 'Jetzt registrieren', url: regUrl } },
-            },
-          }
-        : {
-            messaging_product: 'whatsapp' as const,
-            recipient_type: 'individual' as const,
-            type: 'text' as const,
-            text: { body: bodyText },
-          };
-
-      await sendMessage(phoneNumberId, biz.wa_access_token_enc, tmpEnc, body);
-    }
-    return;
-  }
-
-  // Cooldown prüfen — letzten Keyword-Stempel dieses Kunden holen
-  const cooldownSince = new Date(Date.now() - STAMP_COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
-  const { data: recentStamp } = await supabase
-    .from('stamp_events')
-    .select('created_at')
-    .eq('customer_id', customer.id)
-    .eq('source', 'keyword')
-    .gte('created_at', cooldownSince)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   const { data: biz } = await supabase
     .from('businesses')
-    .select('wa_access_token_enc, message_templates')
+    .select('wa_access_token_enc, slug, message_templates')
     .eq('id', business.id)
     .single();
 
   if (!biz?.wa_access_token_enc) return;
 
-  const customTemplates = (biz.message_templates as Record<string, string> | null) ?? {};
+  const templates = (biz.message_templates as Record<string, string> | null) ?? {};
 
-  if (recentStamp) {
-    // Cooldown aktiv — ablehnen
-    const nextAvailable = new Date(new Date(recentStamp.created_at).getTime() + STAMP_COOLDOWN_HOURS * 60 * 60 * 1000);
-    const hours = Math.ceil((nextAvailable.getTime() - Date.now()) / (60 * 60 * 1000));
-    const cooldownText = (customTemplates['stamp_cooldown'] ?? 'Du hast heute bereits einen Stempel erhalten. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) verfügbar.')
-      .replace('{hours}', String(hours));
-    const { to: _to, ...body } = {
+  // Unknown customer → registration prompt
+  if (!customer) {
+    const tmpEnc = encryptPhone(e164);
+    const regUrl = biz.slug ? `${process.env['CLIENT_URL'] ?? ''}/r/${biz.slug}` : null;
+    const bodyText = templates['not_registered']
+      ?? 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉';
+
+    const body = regUrl
+      ? {
+          messaging_product: 'whatsapp' as const,
+          recipient_type: 'individual' as const,
+          type: 'interactive' as const,
+          interactive: {
+            type: 'cta_url' as const,
+            body: { text: bodyText },
+            action: { name: 'cta_url' as const, parameters: {
+              display_text: templates['not_registered_cta'] ?? 'Jetzt registrieren',
+              url: regUrl,
+            }},
+          },
+        }
+      : {
+          messaging_product: 'whatsapp' as const,
+          recipient_type: 'individual' as const,
+          type: 'text' as const,
+          text: { body: bodyText },
+        };
+
+    await sendMessage(phoneNumberId, biz.wa_access_token_enc, tmpEnc, body);
+    return;
+  }
+
+  // Create pending stamp_request (service handles cooldown + dedup)
+  const result = await createStampRequest(business.id, customer.id);
+
+  const sendText = async (body: string): Promise<void> => {
+    const { to: _to, ...msg } = {
       messaging_product: 'whatsapp' as const,
       recipient_type: 'individual' as const,
       to: e164,
       type: 'text' as const,
-      text: { body: cooldownText },
+      text: { body },
     };
-    await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, body);
+    await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msg);
+  };
+
+  if (result.status === 'cooldown') {
+    const cooldownText = (templates['stamp_cooldown']
+      ?? 'Du hast bereits einen Stempel angefragt. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) möglich.')
+      .replace('{hours}', String(result.hoursLeft));
+    await sendText(cooldownText);
     return;
   }
 
-  // Stempel ausstellen
+  if (result.status === 'duplicate') {
+    await sendText('Deine Anfrage wird gerade bearbeitet. Bitte hab einen Moment Geduld. ⏳');
+    return;
+  }
+
+  // status === 'created' → notify customer that request is pending
   const stampCount = business.stamp_count ?? business.stamps_per_reward;
-  const stages = business.reward_stages ?? [{ stamp: stampCount, description: business.reward_description }];
+  const pendingText = templates['stamp_request_pending']
+    ?? `Deine Stempel-Anfrage wurde empfangen! ✅\n\n📍 Aktuell: ${customer.total_stamps}/${stampCount} Stempel\n\nDer Betreiber bestätigt sie gleich.`;
 
-  const prevTotal   = customer.total_stamps;
-  const newTotal    = prevTotal + 1;
-  const newLifetime = customer.lifetime_stamps + 1;
+  await sendText(pendingText);
 
-  // Welche Reward-Stufen wurden überschritten?
-  const crossed = stages.filter(
-    (s) => s.stamp > prevTotal && s.stamp <= Math.min(newTotal, stampCount),
-  );
-  const rewardIssued = crossed.length > 0;
-  const finalTotal = newTotal >= stampCount ? newTotal % stampCount : newTotal;
-
-  await supabase
-    .from('customers')
-    .update({ total_stamps: finalTotal, lifetime_stamps: newLifetime, last_interaction_at: new Date().toISOString() })
-    .eq('id', customer.id);
-
-  await supabase
-    .from('stamp_events')
-    .insert({ business_id: business.id, customer_id: customer.id, amount: 1, source: 'keyword' });
-
-  const voucherCodes: string[] = [];
-
-  for (const stage of crossed) {
-    const { data: voucher } = await supabase
-      .from('vouchers')
-      .insert({ business_id: business.id, customer_id: customer.id, type: 'reward', description: stage.description })
-      .select('code')
-      .single();
-
-    if (voucher?.code) voucherCodes.push(voucher.code);
-  }
-
-  // Bestätigung mit CTA-Button zur Wallet senden
-  const walletUrl = customer.wallet_token
-    ? `${env.CLIENT_URL}/r/${business.slug}/wallet/${customer.wallet_token}?new=1`
-    : undefined;
-
-  const imageUrl = !rewardIssued && customer.wallet_token && env.BACKEND_URL
-    ? `${env.BACKEND_URL}/api/v1/public/stamp-image/${customer.wallet_token}`
-    : undefined;
-
-  const firstStage = crossed[0];
-
-  // Apply custom template body/CTA if configured, else use defaults
-  let msgObj;
-  if (rewardIssued && firstStage) {
-    const customBody = customTemplates['reward_earned']
-      ?.replace('{description}', firstStage.description)
-      .replace('{code}', voucherCodes.join(', '));
-    const ctaLabel = customTemplates['reward_earned_cta'] ?? undefined;
-    msgObj = rewardEarnedText(e164, voucherCodes.join(', '), firstStage.description, walletUrl, customBody, ctaLabel);
-  } else {
-    const remaining = stampCount - finalTotal;
-    const customBody = customTemplates['stamp_issued']
-      ?.replace('{count}', '1')
-      .replace('{total}', String(finalTotal))
-      .replace('{stampCount}', String(stampCount))
-      .replace('{remaining}', String(remaining));
-    const ctaLabel = customTemplates['stamp_issued_cta'] ?? undefined;
-    msgObj = stampIssuedText(e164, 1, finalTotal, stampCount, walletUrl, customBody, imageUrl, ctaLabel);
-  }
-
-  const { to: _to, ...msgBody } = msgObj;
-  const waMessageId = await sendMessage(phoneNumberId, biz.wa_access_token_enc, customer.phone_enc, msgBody);
-
-  await supabase.from('notification_logs').insert({
-    business_id: business.id,
-    customer_id: customer.id,
-    event_type: rewardIssued ? 'voucher_issued' : 'stamp_issued',
-    status: 'sent',
-    ...(waMessageId !== null ? { wa_message_id: waMessageId } : {}),
-  });
-
-  logger.info({ businessId: business.id, customerId: customer.id, rewardIssued }, 'Keyword stamp issued');
+  logger.info({ businessId: business.id, customerId: customer.id }, 'Stamp request created');
 }
 
 // ── Opt-out ──────────────────────────────────────────────────────────────────
