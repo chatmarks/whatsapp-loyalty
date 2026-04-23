@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import {
-  Users, ShoppingCart, Stamp, Ticket, Plus, Clock, Gift, ScanBarcode, UserCheck, Package,
+  Users, Stamp, Ticket, Gift, ScanBarcode, UserCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useBusinessStats } from '@/hooks/useBusiness';
-import { formatCurrency } from '@/lib/utils';
 import { IssueStampsModal } from '@/components/stamps/IssueStampsModal';
 
 function StatCard({
@@ -62,16 +61,15 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Unternehmensübersicht</h1>
+      <h1 className="text-2xl font-bold">Übersicht</h1>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <StatCard label="Mitglieder" value={isLoading ? '…' : (stats?.memberCount ?? 0)} icon={Users} color="text-blue-500" />
-        <StatCard label="Bestellungen" value={isLoading ? '…' : (stats?.orderCount ?? 0)} icon={ShoppingCart} color="text-green-500" />
-        <StatCard label="Stempel" value={isLoading ? '…' : (stats?.stampTotal ?? 0)} icon={Stamp} color="text-amber-500" />
-        <StatCard label="Aktiv" value={isLoading ? '…' : (stats?.vouchersActive ?? 0)} icon={Ticket} color="text-violet-500" />
-        <StatCard label="Ausgestellt" value={isLoading ? '…' : (stats?.vouchersIssued ?? 0)} icon={Gift} color="text-pink-500" />
-        <StatCard label="Abgeholt" value={isLoading ? '…' : (stats?.vouchersClaimed ?? 0)} icon={ScanBarcode} color="text-orange-500" />
+        <StatCard label="Mitglieder"  value={isLoading ? '…' : (stats?.memberCount ?? 0)}    icon={Users}       color="text-blue-500" />
+        <StatCard label="Stempel"     value={isLoading ? '…' : (stats?.stampTotal ?? 0)}     icon={Stamp}       color="text-amber-500" />
+        <StatCard label="Aktiv"       value={isLoading ? '…' : (stats?.vouchersActive ?? 0)} icon={Ticket}      color="text-violet-500" />
+        <StatCard label="Ausgestellt" value={isLoading ? '…' : (stats?.vouchersIssued ?? 0)} icon={Gift}        color="text-pink-500" />
+        <StatCard label="Abgeholt"    value={isLoading ? '…' : (stats?.vouchersClaimed ?? 0)} icon={ScanBarcode} color="text-orange-500" />
       </div>
 
       {/* Quick Actions */}
@@ -81,14 +79,11 @@ export function DashboardPage() {
           Schnellaktionen
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <QuickActionButton label="Stempel vergeben" icon={Stamp} onClick={() => setStampsOpen(true)} color="bg-blue-100 text-blue-600" />
-          <QuickActionButton label="Bestellung hinzufügen" icon={Plus} onClick={() => navigate('/orders/new')} color="bg-green-100 text-green-600" />
-          <QuickActionButton label="Offene Bestellungen" icon={Clock} onClick={() => navigate('/orders?status=pending')} color="bg-orange-100 text-orange-600" />
-          <QuickActionButton label="Gutschein ausstellen" icon={Ticket} onClick={() => navigate('/vouchers')} color="bg-violet-100 text-violet-600" />
-          <QuickActionButton label="Gutschein einlösen" icon={ScanBarcode} onClick={() => navigate('/vouchers')} color="bg-pink-100 text-pink-600" />
-          <QuickActionButton label="Gutschein abholen" icon={Gift} onClick={() => navigate('/vouchers')} color="bg-amber-100 text-amber-600" />
-          <QuickActionButton label="Kunden" icon={UserCheck} onClick={() => navigate('/customers')} color="bg-sky-100 text-sky-600" />
-          <QuickActionButton label="Produkte" icon={Package} onClick={() => navigate('/products')} color="bg-teal-100 text-teal-600" />
+          <QuickActionButton label="Stempel vergeben"    icon={Stamp}       onClick={() => setStampsOpen(true)}     color="bg-blue-100 text-blue-600" />
+          <QuickActionButton label="Belohnung ausstellen" icon={Ticket}      onClick={() => navigate('/rewards')}   color="bg-violet-100 text-violet-600" />
+          <QuickActionButton label="Belohnung einlösen"   icon={ScanBarcode} onClick={() => navigate('/rewards')}   color="bg-pink-100 text-pink-600" />
+          <QuickActionButton label="Belohnung abholen"    icon={Gift}        onClick={() => navigate('/rewards')}   color="bg-amber-100 text-amber-600" />
+          <QuickActionButton label="Kunden"               icon={UserCheck}   onClick={() => navigate('/customers')} color="bg-sky-100 text-sky-600" />
         </div>
       </div>
 

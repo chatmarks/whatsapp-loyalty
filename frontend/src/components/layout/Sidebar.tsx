@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -10,11 +9,6 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  ChevronDown,
-  Palette,
-  QrCode,
-  CreditCard,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -40,7 +34,7 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: 'Dashboard', to: '/', icon: LayoutDashboard, end: true },
+      { label: 'Übersicht', to: '/', icon: LayoutDashboard, end: true },
     ],
   },
   {
@@ -59,13 +53,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Produkte',     icon: Package,      comingSoon: true },
     ],
   },
-];
-
-const SETTINGS_ITEMS: NavItem[] = [
-  { label: 'Allgemein',        to: '/settings',                      icon: SlidersHorizontal },
-  { label: 'Erscheinungsbild', to: '/settings?tab=erscheinungsbild', icon: Palette },
-  { label: 'QR-Code',          to: '/settings?tab=qrcode',           icon: QrCode },
-  { label: 'Abonnement',       to: '/settings?tab=abonnement',       icon: CreditCard },
 ];
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -109,9 +96,6 @@ function NavItemRow({ item }: { item: NavItem }) {
 export function Sidebar() {
   const business = useAuthStore((s) => s.business);
   const logout = useLogout();
-  const location = useLocation();
-  const isOnSettings = location.pathname === '/settings';
-  const [settingsOpen, setSettingsOpen] = useState(isOnSettings);
 
   return (
     <aside className="flex h-full w-60 flex-col border-r bg-sidebar">
@@ -150,44 +134,20 @@ export function Sidebar() {
 
       {/* Einstellungen + Abmelden */}
       <div className="border-t p-2 space-y-0.5">
-        <button
-          onClick={() => setSettingsOpen((o) => !o)}
-          className={cn(
-            'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-            isOnSettings
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
-          )}
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
+            )
+          }
         >
           <Settings className="h-4 w-4 shrink-0" />
           Einstellungen
-          <ChevronDown
-            className={cn('ml-auto h-3.5 w-3.5 transition-transform', settingsOpen && 'rotate-180')}
-          />
-        </button>
-
-        {settingsOpen && (
-          <ul className="ml-4 space-y-0.5 border-l pl-2">
-            {SETTINGS_ITEMS.map((item) => (
-              <li key={item.label}>
-                <NavLink
-                  to={item.to!}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                      isActive
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
-                    )
-                  }
-                >
-                  <item.icon className="h-3.5 w-3.5 shrink-0" />
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        )}
+        </NavLink>
 
         <button
           onClick={logout}

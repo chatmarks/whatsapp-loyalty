@@ -7,11 +7,10 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Wifi, WifiOff } from 'lucide-react';
 
-type Tab = 'allgemein' | 'treuekarte' | 'erscheinungsbild' | 'whatsapp' | 'nachrichten' | 'qrcode' | 'abonnement';
+type Tab = 'allgemein' | 'erscheinungsbild' | 'whatsapp' | 'nachrichten' | 'qrcode' | 'abonnement';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'allgemein',        label: 'Allgemein' },
-  { id: 'treuekarte',       label: 'Treuekarte' },
   { id: 'erscheinungsbild', label: 'Erscheinungsbild' },
   { id: 'whatsapp',         label: 'WhatsApp' },
   { id: 'nachrichten',      label: 'Nachrichten' },
@@ -62,199 +61,6 @@ function AllgemeinTab() {
         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
       >
         Änderungen speichern
-      </button>
-    </div>
-  );
-}
-
-// ── Treuekarte ───────────────────────────────────────────────────────────────
-const STAMP_COUNT_OPTIONS = [5, 6, 7, 8, 9, 10, 11, 12];
-
-interface RewardStage { stamp: number; description: string; emoji?: string }
-
-function TreuekarteDot({
-  index,
-  stampCount,
-  stages,
-  onToggle,
-}: {
-  index: number;
-  stampCount: number;
-  stages: RewardStage[];
-  onToggle: (pos: number) => void;
-}) {
-  const stage  = stages.find((s) => s.stamp === index);
-  const isReward = !!stage;
-  const isLast   = index === stampCount;
-  const emoji    = stage?.emoji ?? (isLast ? '⭐' : '🎁');
-
-  return (
-    <button
-      type="button"
-      title={isReward ? 'Belohnung entfernen' : 'Als Belohnung markieren'}
-      onClick={() => onToggle(index)}
-      className={cn(
-        'relative flex h-12 w-12 items-center justify-center rounded-full border-2 text-xl transition-all',
-        isReward
-          ? 'border-amber-400 bg-amber-50 shadow-md hover:bg-amber-100'
-          : isLast
-          ? 'border-primary/60 bg-primary/10 hover:bg-primary/20'
-          : 'border-muted-foreground/30 bg-muted/40 hover:bg-muted',
-      )}
-    >
-      {isReward ? emoji : isLast ? '⭐' : (
-        <span className="text-xs font-bold text-muted-foreground">{index}</span>
-      )}
-    </button>
-  );
-}
-
-function TreuekartTab() {
-  const { data: business } = useBusiness();
-  const updateBusiness = useUpdateBusiness();
-
-  const [stampCount, setStampCount] = useState<number>(
-    business?.stamp_count ?? business?.stamps_per_reward ?? 10,
-  );
-  const [stages, setStages] = useState<RewardStage[]>(() => {
-    const base = business?.reward_stages?.length
-      ? business.reward_stages
-      : [{ stamp: business?.stamp_count ?? 10, description: 'Gratis Produkt', emoji: '🎁' }];
-    const count = business?.stamp_count ?? business?.stamps_per_reward ?? 10;
-    if (!base.some((s) => s.stamp === count)) {
-      return [...base, { stamp: count, description: 'Gratis Produkt', emoji: '⭐' }].sort((a, b) => a.stamp - b.stamp);
-    }
-    return base;
-  });
-
-  function handleSetStampCount(n: number) {
-    setStampCount(n);
-    setStages((prev) => prev.filter((s) => s.stamp <= n));
-  }
-
-  function toggleStage(pos: number) {
-    setStages((prev) => {
-      const existing = prev.findIndex((s) => s.stamp === pos);
-      if (existing >= 0) {
-        if (prev.length === 1) return prev;
-        return prev.filter((_, i) => i !== existing);
-      }
-      return [...prev, { stamp: pos, description: '', emoji: '🎁' }].sort((a, b) => a.stamp - b.stamp);
-    });
-  }
-
-  function updateDesc(pos: number, description: string) {
-    setStages((prev) => prev.map((s) => (s.stamp === pos ? { ...s, description } : s)));
-  }
-
-  function updateEmoji(pos: number, emoji: string) {
-    setStages((prev) => prev.map((s) => (s.stamp === pos ? { ...s, emoji } : s)));
-  }
-
-  function handleSave() {
-    const invalid = stages.some((s) => !s.description.trim());
-    if (invalid) { toast.error('Bitte alle Belohnungsbeschreibungen ausfüllen'); return; }
-    const hasFinal = stages.some((s) => s.stamp === stampCount);
-    const finalStages = hasFinal
-      ? stages
-      : [...stages, { stamp: stampCount, description: 'Gratis Produkt', emoji: '⭐' }].sort((a, b) => a.stamp - b.stamp);
-
-    updateBusiness.mutate(
-      { stampCount, rewardStages: finalStages } as Parameters<typeof updateBusiness.mutate>[0],
-      {
-        onSuccess: () => toast.success('Treuekarte gespeichert'),
-        onError: (e) => toast.error(e.message),
-      },
-    );
-  }
-
-  const cols = Math.min(5, stampCount);
-
-  return (
-    <div className="space-y-6 max-w-lg">
-      <div className="rounded-xl border bg-card p-5 space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold">Anzahl Stempel</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Wie viele Stempel passen auf die Karte?</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {STAMP_COUNT_OPTIONS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => handleSetStampCount(n)}
-              className={cn(
-                'h-9 w-9 rounded-lg text-sm font-semibold border transition-colors',
-                stampCount === n
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-border bg-card hover:bg-accent',
-              )}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card p-5 space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold">Belohnungsstufen</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Tippe auf ein Feld, um es als Belohnung zu markieren.
-            🎁 = Belohnung · ⭐ = letzter Stempel (immer Belohnung)
-          </p>
-        </div>
-        <div
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-          className="grid gap-2"
-        >
-          {Array.from({ length: stampCount }, (_, i) => i + 1).map((pos) => (
-            <div key={pos} className="flex flex-col items-center gap-1">
-              <TreuekarteDot index={pos} stampCount={stampCount} stages={stages} onToggle={toggleStage} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {stages.length > 0 && (
-        <div className="rounded-xl border bg-card p-5 space-y-3">
-          <h3 className="text-sm font-semibold">Belohnungen benennen</h3>
-          {stages.sort((a, b) => a.stamp - b.stamp).map((stage) => (
-            <div key={stage.stamp} className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 border-2 border-amber-400 text-base">
-                {stage.emoji ?? '🎁'}
-              </div>
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <p className="text-xs text-muted-foreground">
-                  Stempel {stage.stamp}{stage.stamp === stampCount ? ' (Letzter Stempel)' : ''}
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    value={stage.emoji ?? ''}
-                    onChange={(e) => updateEmoji(stage.stamp, e.target.value)}
-                    placeholder="🎁"
-                    className="flex h-9 w-16 rounded-md border border-input bg-background px-2 text-center text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title="Emoji für diese Belohnung"
-                  />
-                  <input
-                    value={stage.description}
-                    onChange={(e) => updateDesc(stage.stamp, e.target.value)}
-                    placeholder="z.B. Gratis Kaffee"
-                    className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={handleSave}
-        disabled={updateBusiness.isPending}
-        className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {updateBusiness.isPending ? 'Wird gespeichert…' : 'Treuekarte speichern'}
       </button>
     </div>
   );
@@ -880,7 +686,6 @@ export function SettingsPage() {
 
       {/* Tab-Inhalt */}
       {activeTab === 'allgemein'        && <AllgemeinTab />}
-      {activeTab === 'treuekarte'       && <TreuekartTab />}
       {activeTab === 'erscheinungsbild' && <ErscheinungsbildTab />}
       {activeTab === 'whatsapp'         && <WhatsAppTab />}
       {activeTab === 'nachrichten'      && <NachrichtenTab />}

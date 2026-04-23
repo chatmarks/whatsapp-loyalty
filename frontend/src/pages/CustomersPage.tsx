@@ -39,7 +39,7 @@ export function CustomersPage() {
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Nach Name suchen…"
+          placeholder="Nach Name oder Code suchen…"
           className="flex h-10 w-full max-w-sm rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
@@ -49,6 +49,7 @@ export function CustomersPage() {
           <thead className="border-b bg-muted/50">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Code</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Telefon</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Stempel</th>
@@ -57,9 +58,9 @@ export function CustomersPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Wird geladen…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Wird geladen…</td></tr>
             ) : data?.data.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Noch keine Kunden</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Noch keine Kunden</td></tr>
             ) : (
               data?.data.map((c) => (
                 <tr
@@ -71,6 +72,12 @@ export function CustomersPage() {
                   onClick={() => navigate(`/customers/${c.id}`)}
                 >
                   <td className="px-4 py-3 font-medium">{c.display_name ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    {c.customer_code
+                      ? <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold tracking-wider">{c.customer_code}</span>
+                      : <span className="text-muted-foreground">—</span>
+                    }
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{c.phone_display}</td>
                   <td className="px-4 py-3"><StatusPill optedOutAt={c.opted_out_at} /></td>
                   <td className="px-4 py-3 text-right font-semibold">{c.total_stamps}/{stampCount}</td>

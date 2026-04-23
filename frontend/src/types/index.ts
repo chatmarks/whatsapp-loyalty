@@ -46,6 +46,7 @@ export interface Customer {
   phone_display: string;
   display_name: string | null;
   wa_contact_name: string | null;
+  customer_code: string | null;
   total_stamps: number;
   lifetime_stamps: number;
   current_tier_id: string | null;

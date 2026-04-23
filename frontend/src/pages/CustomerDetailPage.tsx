@@ -57,6 +57,9 @@ export function CustomerDetailPage() {
       <div className="rounded-xl border bg-card p-5 space-y-3 text-sm">
         <h2 className="font-semibold">Details</h2>
         <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+          {customer.customer_code && (
+            <><span>Kundencode</span><span className="text-foreground font-mono font-semibold tracking-wider">{customer.customer_code}</span></>
+          )}
           <span>Telefon</span><span className="text-foreground">{customer.phone_display}</span>
           <span>Beigetreten</span><span className="text-foreground">{formatDate(customer.opted_in_at)}</span>
           {customer.last_interaction_at && (

@@ -37,8 +37,9 @@ export async function listCustomers(
     .range(offset, offset + input.pageSize - 1);
 
   if (input.search) {
-    // Search by display_name — never search phone directly
-    query = query.ilike('display_name', `%${input.search}%`);
+    // Search by display_name or customer_code — never search phone directly
+    const trimmed = input.search.trim();
+    query = query.or(`display_name.ilike.%${trimmed}%,customer_code.eq.${trimmed}`);
   }
 
   if (input.optedOut === 'false') query = query.is('opted_out_at', null);

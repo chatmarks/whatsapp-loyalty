@@ -52,6 +52,25 @@ export async function getRegistrationHandler(
   }
 }
 
+/** Generate a random numeric code (4+ digits) unique across all customers. */
+async function generateUniqueCustomerCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    // 4 digits for first attempts; expand to 6 after many collisions
+    const digits = attempt < 15 ? 4 : 6;
+    const min = Math.pow(10, digits - 1);
+    const max = Math.pow(10, digits) - 1;
+    const code = String(Math.floor(min + Math.random() * (max - min + 1)));
+    const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('customer_code', code)
+      .maybeSingle();
+    if (!data) return code;
+  }
+  // Fallback: 8-digit timestamp-based code
+  return String(Date.now()).slice(-8);
+}
+
 export async function submitRegistrationHandler(
   req: Request,
   res: Response,
@@ -92,6 +111,7 @@ export async function submitRegistrationHandler(
         })
         .eq('id', existing.id);
     } else {
+      const customerCode = await generateUniqueCustomerCode();
       await supabase.from('customers').insert({
         business_id: business.id,
         phone_enc: phoneEnc,
@@ -99,6 +119,7 @@ export async function submitRegistrationHandler(
         display_name: input.displayName,
         opted_in_at: new Date().toISOString(),
         opt_in_ip: optInIp,
+        customer_code: customerCode,
       });
     }
 
