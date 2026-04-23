@@ -5,6 +5,7 @@ import {
   getRegistrationHandler,
   submitRegistrationHandler,
   getWalletHandler,
+  redeemWalletVoucherHandler,
   getPublicProductsHandler,
   submitPublicOrderHandler,
 } from './public.controller.js';
@@ -18,6 +19,7 @@ publicRouter.use(publicRateLimit);
 publicRouter.get('/:slug/register', getRegistrationHandler);
 publicRouter.get('/:slug/wallet/:token', getWalletHandler);
 publicRouter.post('/:slug/register', submitRegistrationHandler);
+publicRouter.post('/:slug/wallet/:token/redeem/:code', redeemWalletVoucherHandler);
 publicRouter.get('/:slug/products', getPublicProductsHandler);
 publicRouter.post('/:slug/orders', submitPublicOrderHandler);
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -15,6 +15,10 @@ interface BusinessBranding {
 
 export function PublicRegistrationPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  // Referral code is passed via ?ref= — forwarded during registration
+  const referralCode = searchParams.get('ref') ?? undefined;
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [consent, setConsent] = useState(false);
@@ -32,7 +36,7 @@ export function PublicRegistrationPage() {
       fetch(`${BASE}/${slug}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: name, phone, consentGiven: consent }),
+        body: JSON.stringify({ displayName: name, phone, consentGiven: consent, ...(referralCode ? { referralCode } : {}) }),
       }).then((r) => r.json()),
     onSuccess: () => setSuccess(true),
     onError: () => toast.error('Registrierung fehlgeschlagen'),

@@ -14,6 +14,8 @@ const OptInSchema = z.object({
   consentGiven: z.literal(true, {
     errorMap: () => ({ message: 'DSGVO consent required' }),
   }),
+  // Optional: customer_code of the person who referred this registration
+  referralCode: z.string().max(20).optional(),
 });
 
 async function findBusinessBySlug(slug: string) {
@@ -120,6 +122,8 @@ export async function submitRegistrationHandler(
         opted_in_at: new Date().toISOString(),
         opt_in_ip: optInIp,
         customer_code: customerCode,
+        // Store referrer's customer_code if provided — triggers bonus after first stamp
+        ...(input.referralCode ? { referred_by_code: input.referralCode } : {}),
       });
     }
 
@@ -151,7 +155,7 @@ export async function getWalletHandler(
 
     const { data: customer } = await supabase
       .from('customers')
-      .select('id, display_name, total_stamps, lifetime_stamps')
+      .select('id, display_name, total_stamps, lifetime_stamps, customer_code')
       .eq('business_id', business.id)
       .eq('wallet_token', req.params['token'])
       .is('opted_out_at', null)
@@ -182,10 +186,64 @@ export async function getWalletHandler(
           displayName: customer.display_name,
           totalStamps: customer.total_stamps,
           lifetimeStamps: customer.lifetime_stamps,
+          // customer_code doubles as the shareable referral code
+          referralCode: customer.customer_code ?? null,
         },
         vouchers: vouchers ?? [],
       },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Redeem a voucher directly from the wallet.
+ * Auth: wallet_token scopes access to exactly one customer's vouchers.
+ */
+export async function redeemWalletVoucherHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { slug, token, code } = req.params as { slug: string; token: string; code: string };
+
+    const business = await findBusinessBySlug(slug);
+    if (!business) throw new NotFoundError('Business');
+
+    // Resolve customer from wallet token
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('business_id', business.id)
+      .eq('wallet_token', token)
+      .is('opted_out_at', null)
+      .maybeSingle();
+
+    if (!customer) throw new NotFoundError('Wallet');
+
+    // Find the voucher — must belong to this customer and not yet redeemed
+    const { data: voucher } = await supabase
+      .from('vouchers')
+      .select('id, redeemed_at')
+      .eq('business_id', business.id)
+      .eq('customer_id', customer.id)
+      .eq('code', code.toUpperCase())
+      .maybeSingle();
+
+    if (!voucher) throw new NotFoundError('Voucher');
+    if (voucher.redeemed_at) {
+      res.status(409).json({ error: 'Voucher already redeemed' });
+      return;
+    }
+
+    await supabase
+      .from('vouchers')
+      .update({ redeemed_at: new Date().toISOString() })
+      .eq('id', voucher.id);
+
+    res.json({ data: { success: true } });
   } catch (err) {
     next(err);
   }

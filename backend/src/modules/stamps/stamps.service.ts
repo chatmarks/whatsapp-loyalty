@@ -209,5 +209,96 @@ export async function issueStamps(
     notifyAsync().catch((err) => logger.error({ err }, 'Unhandled error in WhatsApp notification'));
   }
 
+  // Referral bonus — fires only when this is the referred customer's
+  // very first stamp ever. Issues +1 referral stamp to both parties.
+  if (customer.lifetime_stamps === 0 && input.amount > 0) {
+    processReferralBonus(businessId, input.customerId, stampCount).catch((err) =>
+      logger.error({ err }, 'Referral bonus processing failed'),
+    );
+  }
+
   return result;
+}
+
+/**
+ * Issues a one-time +1 referral stamp to both the referred customer and
+ * the customer who referred them. Sets referral_reward_at to prevent re-trigger.
+ * Called fire-and-forget from issueStamps — never blocks the main flow.
+ */
+async function processReferralBonus(
+  businessId: string,
+  customerId: string,
+  stampCount: number,
+): Promise<void> {
+  const { data: cust } = await supabase
+    .from('customers')
+    .select('referred_by_code, referral_reward_at, total_stamps, lifetime_stamps')
+    .eq('id', customerId)
+    .single();
+
+  if (!cust?.referred_by_code || cust.referral_reward_at) return;
+
+  // Atomically claim the slot — prevents double-issue under concurrent requests
+  const { error: claimErr } = await supabase
+    .from('customers')
+    .update({ referral_reward_at: new Date().toISOString() })
+    .eq('id', customerId)
+    .is('referral_reward_at', null); // only if not already claimed
+
+  if (claimErr) {
+    logger.error({ claimErr }, 'Failed to claim referral slot');
+    return;
+  }
+
+  // +1 bonus stamp to the referred customer
+  const refNew = (cust.total_stamps as number) + 1;
+  const refFinal = refNew >= stampCount ? refNew % stampCount : refNew;
+  await supabase
+    .from('customers')
+    .update({ total_stamps: refFinal, lifetime_stamps: (cust.lifetime_stamps as number) + 1 })
+    .eq('id', customerId);
+
+  await supabase.from('stamp_events').insert({
+    business_id: businessId,
+    customer_id: customerId,
+    amount: 1,
+    source: 'referral',
+    issued_by: businessId,
+  });
+
+  // Find the referrer by their customer_code
+  const { data: referrer } = await supabase
+    .from('customers')
+    .select('id, total_stamps, lifetime_stamps')
+    .eq('business_id', businessId)
+    .eq('customer_code', cust.referred_by_code)
+    .is('opted_out_at', null)
+    .maybeSingle();
+
+  if (!referrer) return;
+
+  // +1 bonus stamp to the referrer
+  const rrNew = (referrer.total_stamps as number) + 1;
+  const rrFinal = rrNew >= stampCount ? rrNew % stampCount : rrNew;
+  await supabase
+    .from('customers')
+    .update({
+      total_stamps: rrFinal,
+      lifetime_stamps: (referrer.lifetime_stamps as number) + 1,
+      last_interaction_at: new Date().toISOString(),
+    })
+    .eq('id', referrer.id);
+
+  await supabase.from('stamp_events').insert({
+    business_id: businessId,
+    customer_id: referrer.id,
+    amount: 1,
+    source: 'referral',
+    issued_by: businessId,
+  });
+
+  logger.info(
+    { businessId, customerId, referrerId: referrer.id },
+    'Referral bonus stamps issued to both parties',
+  );
 }
