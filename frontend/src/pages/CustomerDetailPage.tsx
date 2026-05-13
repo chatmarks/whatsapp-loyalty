@@ -89,7 +89,7 @@ export function CustomerDetailPage() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-violet-500" />
-            <h2 className="font-semibold text-sm">Eingeladen</h2>
+            <h2 className="font-semibold text-sm">Empfehlungen</h2>
             {referrals.length > 0 && (
               <span className="ml-auto rounded-full bg-violet-100 text-violet-700 text-xs font-semibold px-2 py-0.5">
                 {referrals.length}
@@ -97,7 +97,7 @@ export function CustomerDetailPage() {
             )}
           </div>
           {referrals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Noch niemanden eingeladen.</p>
+            <p className="text-sm text-muted-foreground">Hat noch niemanden empfohlen.</p>
           ) : (
             <div className="divide-y">
               {referrals.map((r) => (

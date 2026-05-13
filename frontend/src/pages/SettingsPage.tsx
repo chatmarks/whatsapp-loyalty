@@ -7,15 +7,12 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Wifi, WifiOff } from 'lucide-react';
 
-type Tab = 'allgemein' | 'erscheinungsbild' | 'whatsapp' | 'nachrichten' | 'qrcode' | 'abonnement';
+type Tab = 'allgemein' | 'whatsapp' | 'abonnement';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'allgemein',        label: 'Allgemein' },
-  { id: 'erscheinungsbild', label: 'Erscheinungsbild' },
-  { id: 'whatsapp',         label: 'WhatsApp' },
-  { id: 'nachrichten',      label: 'Nachrichten' },
-  { id: 'qrcode',           label: 'QR-Code' },
-  { id: 'abonnement',       label: 'Abonnement' },
+  { id: 'allgemein',  label: 'Allgemein' },
+  { id: 'whatsapp',   label: 'WhatsApp' },
+  { id: 'abonnement', label: 'Abonnement' },
 ];
 
 // ── Allgemein ────────────────────────────────────────────────────────────────
@@ -61,70 +58,6 @@ function AllgemeinTab() {
         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
       >
         Änderungen speichern
-      </button>
-    </div>
-  );
-}
-
-// ── Erscheinungsbild ─────────────────────────────────────────────────────────
-function ErscheinungsbildTab() {
-  const { data: business } = useBusiness();
-  const updateBusiness = useUpdateBusiness();
-  const [primaryColor, setPrimaryColor] = useState(business?.primary_color ?? '#25D366');
-
-  return (
-    <div className="rounded-xl border bg-card p-5 space-y-5 max-w-lg">
-      <div>
-        <label className="text-sm font-medium">Primärfarbe</label>
-        <div className="mt-2 flex items-center gap-3">
-          <input
-            type="color"
-            value={primaryColor}
-            onChange={(e) => setPrimaryColor(e.target.value)}
-            className="h-10 w-16 cursor-pointer rounded border"
-          />
-          <span className="text-sm text-muted-foreground font-mono">{primaryColor}</span>
-        </div>
-      </div>
-      <button
-        onClick={() =>
-          updateBusiness.mutate(
-            { primaryColor } as Parameters<typeof updateBusiness.mutate>[0],
-            {
-              onSuccess: () => toast.success('Gespeichert'),
-              onError: (e) => toast.error(e.message),
-            },
-          )
-        }
-        disabled={updateBusiness.isPending}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {updateBusiness.isPending ? 'Wird gespeichert…' : 'Speichern'}
-      </button>
-    </div>
-  );
-}
-
-// ── QR-Code ──────────────────────────────────────────────────────────────────
-function QrCodeTab() {
-  const { data: business } = useBusiness();
-  const registrationUrl = business ? `${window.location.origin}/r/${business.slug}` : '';
-
-  return (
-    <div className="rounded-xl border bg-card p-6 space-y-4 max-w-sm text-center">
-      <p className="text-sm text-muted-foreground">
-        Kunden scannen diesen Code, um deinem Treueprogramm beizutreten.
-      </p>
-      {registrationUrl && (
-        <div className="rounded-lg bg-muted p-3">
-          <p className="text-xs font-mono break-all text-foreground">{registrationUrl}</p>
-        </div>
-      )}
-      <button
-        onClick={() => { navigator.clipboard.writeText(registrationUrl); toast.success('Link kopiert'); }}
-        className="rounded-md border px-4 py-2 text-sm hover:bg-accent transition-colors"
-      >
-        Link kopieren
       </button>
     </div>
   );
@@ -368,241 +301,6 @@ function WhatsAppTab() {
 }
 
 
-// ── Nachrichten ───────────────────────────────────────────────────────────────
-
-interface TemplateField {
-  key: string;
-  label: string;
-  hint: string;
-  variables: string[];
-  /** Optional CTA button key in message_templates */
-  ctaKey?: string;
-  defaultCta?: string;
-}
-
-const TEMPLATE_FIELDS: TemplateField[] = [
-  {
-    key: 'stamp_issued',
-    label: 'Stempel erhalten',
-    hint: 'Benachrichtigung nach jeder Stempel-Vergabe.',
-    variables: ['{count}', '{total}', '{stampCount}', '{remaining}'],
-    ctaKey: 'stamp_issued_cta',
-    defaultCta: 'Stempelkarte öffnen',
-  },
-  {
-    key: 'reward_earned',
-    label: 'Belohnung erhalten',
-    hint: 'Wird gesendet, wenn ein Reward-Schwellenwert erreicht wird.',
-    variables: ['{description}', '{code}'],
-    ctaKey: 'reward_earned_cta',
-    defaultCta: 'Gutschein ansehen',
-  },
-  {
-    key: 'not_registered',
-    label: 'Nicht registriert',
-    hint: 'Wenn ein unbekannter Kontakt ein Keyword schreibt.',
-    variables: [],
-    ctaKey: 'not_registered_cta',
-    defaultCta: 'Jetzt registrieren',
-  },
-  {
-    key: 'stamp_cooldown',
-    label: 'Cooldown-Hinweis',
-    hint: 'Bei zu frühem Keyword-Stempel (8h-Sperre).',
-    variables: ['{hours}'],
-  },
-  {
-    key: 'opt_out_confirm',
-    label: 'Abmeldung bestätigt',
-    hint: 'Bestätigung nach Opt-out. Keine Variablen.',
-    variables: [],
-  },
-  {
-    key: 'opt_in_welcome',
-    label: 'Willkommensnachricht',
-    hint: 'Nach erfolgreicher Registrierung gesendet.',
-    variables: ['{name}', '{businessName}'],
-  },
-];
-
-const DEFAULT_BODIES: Record<string, string> = {
-  not_registered: 'Du bist noch nicht registriert. Melde dich hier an und sammle Stempel! 🎉',
-  stamp_cooldown: 'Du hast heute bereits einen Stempel erhalten. ⏳\n\nDer nächste ist in ca. {hours} Stunde(n) verfügbar.',
-  stamp_issued: 'Du hast {count} Stempel erhalten! 🎉\n\n📍 Aktueller Stand: {total}/{stampCount} Stempel\nNoch {remaining} bis zu deiner Belohnung.',
-  reward_earned: '🎉 Glückwunsch! Du hast deine Belohnung verdient!\n\n🎁 {description}\nDein Code: *{code}*\n\nZeige diesen Code beim nächsten Besuch vor.',
-  opt_out_confirm: 'Du wurdest erfolgreich vom Treueprogramm abgemeldet. Auf Wiedersehen! 👋',
-  opt_in_welcome: 'Willkommen bei {businessName}, {name}! 🎉\n\nDu bist jetzt Teil unseres Treueprogramms. Schreibe "Stempel" nach deinem nächsten Besuch, um deinen ersten Stempel zu sammeln!',
-};
-
-// Replace template variables with example values for preview
-const PREVIEW_VARS: Record<string, string> = {
-  '{count}': '1',
-  '{total}': '5',
-  '{stampCount}': '10',
-  '{remaining}': '5',
-  '{hours}': '6',
-  '{description}': 'Gratis Kaffee',
-  '{code}': 'ABC-123',
-  '{name}': 'Max',
-  '{businessName}': 'Café Muster',
-};
-
-function applyPreviewVars(text: string): string {
-  return Object.entries(PREVIEW_VARS).reduce((t, [k, v]) => t.replaceAll(k, v), text);
-}
-
-/** WhatsApp-style message bubble for preview */
-function WaBubble({ body, ctaLabel }: { body: string; ctaLabel?: string | undefined }) {
-  return (
-    <div className="bg-[#ECE5DD] rounded-xl p-4 max-w-xs">
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-3 py-2.5">
-          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words text-[#111B21]">
-            {applyPreviewVars(body)}
-          </p>
-          <p className="text-[10px] text-[#667781] mt-1 text-right">12:34 ✓✓</p>
-        </div>
-        {ctaLabel && (
-          <div className="border-t border-[#E9EDEF]">
-            <button className="w-full py-2.5 text-[13px] font-medium text-[#00A884] text-center hover:bg-[#F5F6F6] transition-colors">
-              {ctaLabel}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function NachrichtenTab() {
-  const { data: business } = useBusiness();
-  const updateBusiness = useUpdateBusiness();
-
-  const [activeKey, setActiveKey] = useState(TEMPLATE_FIELDS[0]?.key ?? 'stamp_issued');
-  const [templates, setTemplates] = useState<Record<string, string>>(() => ({
-    ...DEFAULT_BODIES,
-    ...(business?.message_templates ?? {}),
-  }));
-
-  const activeField = TEMPLATE_FIELDS.find((f) => f.key === activeKey)!;
-  const body = templates[activeKey] ?? DEFAULT_BODIES[activeKey] ?? '';
-  const ctaValue = activeField.ctaKey
-    ? (templates[activeField.ctaKey] ?? activeField.defaultCta ?? '')
-    : undefined;
-
-  function handleSave() {
-    updateBusiness.mutate(
-      { messageTemplates: templates } as Parameters<typeof updateBusiness.mutate>[0],
-      {
-        onSuccess: () => toast.success('Gespeichert'),
-        onError: (e) => toast.error(e.message),
-      },
-    );
-  }
-
-  return (
-    <div className="flex gap-6 max-w-4xl">
-      {/* Left sidebar — template list */}
-      <nav className="w-52 shrink-0 space-y-1">
-        {TEMPLATE_FIELDS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setActiveKey(f.key)}
-            className={cn(
-              'w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors',
-              activeKey === f.key
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* Right panel */}
-      <div className="flex-1 min-w-0 space-y-5">
-        <div>
-          <h2 className="font-semibold">{activeField.label}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{activeField.hint}</p>
-          {activeField.variables.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {activeField.variables.map((v) => (
-                <span key={v} className="rounded-full bg-muted border px-2 py-0.5 text-xs font-mono text-muted-foreground">
-                  {v}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-5 items-start">
-          {/* Editor */}
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Nachrichtentext</label>
-              <textarea
-                rows={6}
-                value={body}
-                onChange={(e) =>
-                  setTemplates((prev) => ({ ...prev, [activeKey]: e.target.value }))
-                }
-                className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setTemplates((prev) => ({ ...prev, [activeKey]: DEFAULT_BODIES[activeKey] ?? '' }))
-                }
-                className="mt-1 text-xs text-muted-foreground hover:text-foreground underline"
-              >
-                Zurücksetzen
-              </button>
-            </div>
-
-            {activeField.ctaKey !== undefined && (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Button-Text (CTA)</label>
-                <input
-                  value={ctaValue ?? ''}
-                  onChange={(e) =>
-                    setTemplates((prev) => ({
-                      ...prev,
-                      [activeField.ctaKey!]: e.target.value,
-                    }))
-                  }
-                  placeholder={activeField.defaultCta}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Standard: „{activeField.defaultCta}"
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={handleSave}
-              disabled={updateBusiness.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {updateBusiness.isPending ? 'Wird gespeichert…' : 'Speichern'}
-            </button>
-          </div>
-
-          {/* Preview */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Vorschau</p>
-            <WaBubble
-              body={body}
-              {...(ctaValue ? { ctaLabel: ctaValue } : {})}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Hauptseite ───────────────────────────────────────────────────────────────
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -611,18 +309,13 @@ export function SettingsPage() {
 
   function switchTab(id: Tab) {
     setActiveTab(id);
-    if (id === 'allgemein') {
-      setSearchParams({});
-    } else {
-      setSearchParams({ tab: id });
-    }
+    setSearchParams(id === 'allgemein' ? {} : { tab: id });
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Einstellungen</h1>
 
-      {/* Tab-Leiste */}
       <div className="flex gap-1 border-b overflow-x-auto">
         {TABS.map(({ id, label }) => (
           <button
@@ -630,9 +323,7 @@ export function SettingsPage() {
             onClick={() => switchTab(id)}
             className={cn(
               'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
-              activeTab === id
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+              activeTab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             {label}
@@ -640,13 +331,9 @@ export function SettingsPage() {
         ))}
       </div>
 
-      {/* Tab-Inhalt */}
-      {activeTab === 'allgemein'        && <AllgemeinTab />}
-      {activeTab === 'erscheinungsbild' && <ErscheinungsbildTab />}
-      {activeTab === 'whatsapp'         && <WhatsAppTab />}
-      {activeTab === 'nachrichten'      && <NachrichtenTab />}
-      {activeTab === 'qrcode'           && <QrCodeTab />}
-      {activeTab === 'abonnement'       && <AbonnementTab />}
+      {activeTab === 'allgemein'  && <AllgemeinTab />}
+      {activeTab === 'whatsapp'   && <WhatsAppTab />}
+      {activeTab === 'abonnement' && <AbonnementTab />}
     </div>
   );
 }

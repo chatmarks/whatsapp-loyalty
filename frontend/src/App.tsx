@@ -11,6 +11,7 @@ import { StampsPage } from '@/pages/StampsPage';
 import { RewardsPage } from '@/pages/RewardsPage';
 import { BlastsPage } from '@/pages/BlastsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { ProgramPage } from '@/pages/ProgramPage';
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
 import { QrRedirectPage } from '@/pages/QrRedirectPage';
 import { CustomerWalletPage } from '@/pages/CustomerWalletPage';
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="customers/:id/chat" element={<CustomerChatPage />} />
         <Route path="stamps" element={<StampsPage />} />
         <Route path="rewards" element={<RewardsPage />} />
+        <Route path="program" element={<ProgramPage />} />
         {/* Legacy redirect */}
         <Route path="vouchers" element={<Navigate to="/rewards" replace />} />
         <Route path="blasts" element={<BlastsPage />} />

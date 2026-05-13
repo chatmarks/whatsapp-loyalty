@@ -5,7 +5,7 @@ import type { Customer, PaginatedResponse } from '@/types';
 interface ListParams {
   search?: string;
   page?: number;
-  pageSize?: number;
+  pageSize?: number; // default 20, max 100
   optedOut?: 'true' | 'false';
 }
 

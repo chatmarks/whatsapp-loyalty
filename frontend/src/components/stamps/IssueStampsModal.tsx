@@ -17,9 +17,11 @@ export function IssueStampsModal({ open, onOpenChange }: Props) {
   const [amount, setAmount] = useState(1);
   const [notify, setNotify] = useState(true);
 
+  // Always load customers so the full list is visible without typing
   const { data: customersRes } = useCustomers({
-    ...(search.length > 1 ? { search } : {}),
+    ...(search.length > 0 ? { search } : {}),
     optedOut: 'false',
+    pageSize: 50,
   });
 
   const issueStamps = useIssueStamps();
@@ -102,31 +104,37 @@ export function IssueStampsModal({ open, onOpenChange }: Props) {
               </button>
             </div>
           ) : (
-            <div className="relative">
+            <div>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Mitglied suchen oder hinzufügen…"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="Suchen…"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-2"
               />
-              {search.length > 1 && customersRes?.data && customersRes.data.length > 0 && (
-                <div className="absolute top-full left-0 z-10 mt-1 w-full rounded-md border bg-popover shadow-md">
-                  {customersRes.data.map((c) => (
-                    <button
-                      key={c.id}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
-                      onClick={() => {
-                        setSelectedCustomerId(c.id);
-                        setSelectedCustomerName(c.display_name ?? c.phone_display);
-                        setSearch('');
-                      }}
-                    >
-                      <span className="font-medium">{c.display_name ?? '—'}</span>
-                      <span className="text-muted-foreground">{c.phone_display}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="max-h-44 overflow-y-auto rounded-md border bg-popover divide-y">
+                {customersRes?.data.length === 0 && (
+                  <p className="px-3 py-3 text-sm text-muted-foreground text-center">Keine Kunden gefunden</p>
+                )}
+                {customersRes?.data.map((c) => (
+                  <button
+                    key={c.id}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-sm hover:bg-accent text-left"
+                    onClick={() => {
+                      setSelectedCustomerId(c.id);
+                      setSelectedCustomerName(c.display_name ?? c.phone_display);
+                      setSearch('');
+                    }}
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {(c.display_name ?? '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-medium block truncate">{c.display_name ?? '—'}</span>
+                      <span className="text-xs text-muted-foreground">{c.phone_display}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

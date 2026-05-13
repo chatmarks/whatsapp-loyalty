@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Settings,
   LogOut,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -43,7 +44,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Kunden',      to: '/customers', icon: Users },
       { label: 'Stempel',     to: '/stamps',    icon: Stamp },
       { label: 'Belohnungen', to: '/rewards',   icon: Gift },
-      { label: 'Broadcasts',  to: '/blasts',    icon: MessageSquare },
+      { label: 'Programm',    to: '/program',   icon: SlidersHorizontal },
+      { label: 'Blasts',      icon: MessageSquare, comingSoon: true },
     ],
   },
   {
